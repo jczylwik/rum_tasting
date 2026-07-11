@@ -102,8 +102,8 @@ const defaultState = {
   ratings: {}
 };
 
-let state = loadState();
 let stateSignature = '';
+let state = loadState();
 let eventSource = null;
 let pollTimer = null;
 let loadingRemoteState = false;
