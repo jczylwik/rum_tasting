@@ -248,6 +248,7 @@ function addParticipant(name) {
   if (existing) {
     state.activeParticipantId = existing.id;
     persistLocalState();
+    render();
     syncState({ participants: state.participants, ratings: state.ratings });
     return;
   }
@@ -257,12 +258,14 @@ function addParticipant(name) {
   state.activeParticipantId = participant.id;
   state.ratings[participant.id] = {};
   persistLocalState();
+  render();
   syncState({ participants: state.participants, ratings: state.ratings });
 }
 
 function setActiveParticipant(id) {
   state.activeParticipantId = id;
   persistLocalState();
+  render();
 }
 
 function removeParticipant(id) {
@@ -272,6 +275,7 @@ function removeParticipant(id) {
     state.activeParticipantId = state.participants[0]?.id || null;
   }
   persistLocalState();
+  render();
   syncState({ participants: state.participants, ratings: state.ratings });
 }
 
@@ -282,6 +286,7 @@ function setRating(itemKey, rating) {
   }
   state.ratings[state.activeParticipantId][itemKey] = rating;
   persistLocalState();
+  render();
   syncState({ ratings: state.ratings });
 }
 
@@ -292,6 +297,7 @@ function setActiveCategory(category) {
     state.activeItemId = items[0]?.id || null;
   }
   persistLocalState();
+  render();
 }
 
 function changeItem(direction) {
@@ -301,6 +307,7 @@ function changeItem(direction) {
   const nextIndex = (currentIndex + direction + items.length) % items.length;
   state.activeItemId = items[nextIndex].id;
   persistLocalState();
+  render();
 }
 
 function getCurrentItem() {
