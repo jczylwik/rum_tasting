@@ -32,6 +32,8 @@ rum_tasting/
 ├─ data.json
 ├─ requirements.txt
 ├─ startup.sh
+├─ .github/
+│  └─ copilot-instructions.md
 ├─ web/
 │  ├─ index.html
 │  ├─ styles.css
@@ -47,6 +49,7 @@ rum_tasting/
 │     ├─ rum_tasting_print.html
 │     └─ rum_tasting_print1.html
 └─ docs/
+   ├─ MAINTAINERS.md
    ├─ PROJECT_OVERVIEW.md
    ├─ DEVELOPMENT.md
    └─ DEPLOYMENT_AZURE.md
