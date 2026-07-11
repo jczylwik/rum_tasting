@@ -1,13 +1,7 @@
 {
-  "participants": [
-    {
-      "id": "p1",
-      "name": "Anna"
-    }
-  ],
-  "ratings": {
-    "p1": {
-      "ron-abuelo": 5
-    }
-  }
+  "participants": [],
+  "ratings": {},
+  "activeParticipantId": null,
+  "activeCategory": "rum",
+  "activeItemId": null
 }

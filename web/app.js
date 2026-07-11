@@ -388,7 +388,7 @@ function renderParticipants() {
 function renderActiveParticipant() {
   const container = document.getElementById('active-participant');
   if (!state.activeParticipantId) {
-    container.textContent = 'Noch kein Teilnehmer ausgewählt.';
+    container.textContent = 'Aktiver Teilnehmer: noch keiner ausgewählt';
     return;
   }
 
@@ -440,7 +440,7 @@ function renderItemExplorer() {
         <h4>Bewertung</h4>
         <div class="stars" aria-label="Bewertung für ${currentItem.name}">
           ${[1, 2, 3, 4, 5].map((value) => `
-            <button class="star-btn ${currentRating === value ? 'active' : ''}" type="button" data-item="${currentItem.id}" data-rating="${value}" aria-label="${value} Sterne">★</button>
+            <button class="star-btn ${currentRating >= value ? 'active' : ''}" type="button" data-item="${currentItem.id}" data-rating="${value}" aria-label="${value} Sterne">★</button>
           `).join('')}
         </div>
         <small>${currentRating ? `Deine Bewertung: ${currentRating}/5` : 'Noch keine Bewertung'}</small>
