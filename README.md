@@ -9,6 +9,7 @@ This is a simple, mobile-friendly tasting app for rum and cigars. It supports pa
 - 1 to 5 star ratings
 - Average score and histogram per item and overall
 - Shared persistence via the API at /api/state
+- Live updates across multiple devices (server-sent events with polling fallback)
 - Installable Progressive Web App (PWA)
 - Azure App Service deployment prepared
 
@@ -70,6 +71,7 @@ rum_tasting/
 - GET /api/state returns the shared state.
 - POST /api/state saves updates as JSON.
 - GET /healthz returns a basic health check ("status": "ok").
+- GET /api/events streams state-change events for real-time UI refresh.
 
 The data structure includes at least:
 
@@ -84,6 +86,8 @@ The data structure includes at least:
 - Frontend logic is in web/app.js.
 - Any data model changes should stay consistent across frontend and backend.
 - The server listens on PORT so it works on Azure App Service.
+- For small groups and a single app instance, file-based storage with SSE is sufficient.
+- A dedicated database becomes useful when you need stronger concurrency guarantees, history/audit data, or horizontal scaling across multiple app instances.
 
 ## Legacy Print Template
 

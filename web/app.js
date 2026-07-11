@@ -1,5 +1,7 @@
 const STORAGE_KEY = 'rum-tasting-v1';
 const API_URL = '/api/state';
+const EVENTS_URL = '/api/events';
+const FALLBACK_POLL_INTERVAL_MS = 5000;
 
 const catalog = {
   rum: [
@@ -101,24 +103,54 @@ const defaultState = {
 };
 
 let state = loadState();
+let stateSignature = '';
+let eventSource = null;
+let pollTimer = null;
+let loadingRemoteState = false;
+
+
+function buildStateSignature(inputState) {
+  return JSON.stringify(inputState);
+}
 
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     const parsed = saved ? JSON.parse(saved) : defaultState;
-    return {
+    const loaded = {
       ...defaultState,
       ...parsed,
       participants: parsed.participants || [],
       ratings: parsed.ratings || {}
     };
+    stateSignature = buildStateSignature(loaded);
+    return loaded;
   } catch {
+    stateSignature = buildStateSignature(defaultState);
     return defaultState;
   }
 }
 
 function persistLocalState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  stateSignature = buildStateSignature(state);
+}
+
+function applyRemoteState(remoteState) {
+  const merged = {
+    ...defaultState,
+    ...remoteState,
+    participants: remoteState.participants || [],
+    ratings: remoteState.ratings || {}
+  };
+  const nextSignature = buildStateSignature(merged);
+  if (nextSignature === stateSignature) {
+    return;
+  }
+
+  state = merged;
+  persistLocalState();
+  render();
 }
 
 async function syncState() {
@@ -132,27 +164,62 @@ async function syncState() {
       throw new Error('sync failed');
     }
     const serverState = await response.json();
-    state = { ...defaultState, ...serverState, participants: serverState.participants || [], ratings: serverState.ratings || {} };
-    persistLocalState();
-    render();
+    applyRemoteState(serverState);
   } catch {
     persistLocalState();
   }
 }
 
 async function loadRemoteState() {
+  if (loadingRemoteState) return;
+  loadingRemoteState = true;
   try {
     const response = await fetch(API_URL);
     if (!response.ok) {
       throw new Error('load failed');
     }
     const remoteState = await response.json();
-    state = { ...defaultState, ...remoteState, participants: remoteState.participants || [], ratings: remoteState.ratings || {} };
-    persistLocalState();
-    render();
+    applyRemoteState(remoteState);
   } catch {
     persistLocalState();
+  } finally {
+    loadingRemoteState = false;
   }
+}
+
+function startFallbackPolling() {
+  if (pollTimer) return;
+  pollTimer = window.setInterval(() => {
+    loadRemoteState();
+  }, FALLBACK_POLL_INTERVAL_MS);
+}
+
+function stopFallbackPolling() {
+  if (!pollTimer) return;
+  window.clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+function startRealtimeUpdates() {
+  if (!('EventSource' in window)) {
+    startFallbackPolling();
+    return;
+  }
+
+  eventSource = new EventSource(EVENTS_URL);
+  eventSource.onopen = () => {
+    stopFallbackPolling();
+  };
+  eventSource.onmessage = () => {
+    loadRemoteState();
+  };
+  eventSource.onerror = () => {
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    startFallbackPolling();
+  };
 }
 
 function createParticipantId(name) {
@@ -484,6 +551,7 @@ document.addEventListener('click', handleAppClick);
 
 render();
 loadRemoteState();
+startRealtimeUpdates();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
