@@ -110,6 +110,13 @@ let pollTimer = null;
 let loadingRemoteState = false;
 let isParticipantPanelOpen = !state.activeParticipantId;
 let statsFilterItemId = 'all';
+let swipeStartX = null;
+let swipeStartY = null;
+let swipeStartTime = 0;
+
+const SWIPE_MIN_DISTANCE_PX = 48;
+const SWIPE_MAX_DURATION_MS = 650;
+const SWIPE_MAX_VERTICAL_DRIFT_PX = 42;
 
 
 function buildStateSignature(inputState) {
@@ -430,6 +437,47 @@ function toggleParticipantPanel() {
   render();
 }
 
+function setupSwipeNavigation() {
+  const explorer = document.getElementById('item-explorer');
+  if (!explorer) return;
+
+  explorer.addEventListener('touchstart', (event) => {
+    if (!event.touches || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    swipeStartX = touch.clientX;
+    swipeStartY = touch.clientY;
+    swipeStartTime = Date.now();
+  }, { passive: true });
+
+  explorer.addEventListener('touchend', (event) => {
+    if (swipeStartX === null || swipeStartY === null) return;
+    const touch = event.changedTouches && event.changedTouches[0];
+    if (!touch) return;
+
+    const deltaX = touch.clientX - swipeStartX;
+    const deltaY = touch.clientY - swipeStartY;
+    const elapsed = Date.now() - swipeStartTime;
+
+    swipeStartX = null;
+    swipeStartY = null;
+    swipeStartTime = 0;
+
+    const isHorizontalSwipe = Math.abs(deltaX) >= SWIPE_MIN_DISTANCE_PX
+      && Math.abs(deltaY) <= SWIPE_MAX_VERTICAL_DRIFT_PX
+      && Math.abs(deltaX) > Math.abs(deltaY)
+      && elapsed <= SWIPE_MAX_DURATION_MS;
+
+    if (!isHorizontalSwipe) return;
+    if (!state.activeParticipantId) return;
+
+    if (deltaX < 0) {
+      changeItem(1);
+    } else {
+      changeItem(-1);
+    }
+  }, { passive: true });
+}
+
 function setStatsFilterItem(itemId) {
   const allItems = Object.values(catalog).flat();
   if (itemId !== 'all' && !allItems.some((item) => item.id === itemId)) {
@@ -442,10 +490,18 @@ function setStatsFilterItem(itemId) {
 function renderParticipantPanelVisibility() {
   const section = document.getElementById('participant-section');
   const button = document.getElementById('active-participant');
-  const isOpen = !state.activeParticipantId || isParticipantPanelOpen;
+  const hasActiveParticipant = Boolean(state.activeParticipantId);
+  const isOpen = !hasActiveParticipant || isParticipantPanelOpen;
 
+  section.hidden = hasActiveParticipant && !isOpen;
   section.classList.toggle('collapsed', !isOpen);
   button.setAttribute('aria-expanded', String(isOpen));
+}
+
+function renderExperienceVisibility() {
+  const section = document.getElementById('experience-section');
+  if (!section) return;
+  section.hidden = !state.activeParticipantId;
 }
 
 function renderParticipants() {
@@ -595,6 +651,12 @@ function renderStats() {
   const histogramLabel = statsFilterItemId === 'all'
     ? 'Histogramm der Gesamtbewertungen'
     : `Histogramm fuer ${selectedFilterItem?.name || 'Auswahl'}`;
+  const filteredAverageNumber = statsFilterItemId === 'all'
+    ? overallAverageNumber
+    : getAverageNumberForItem(statsFilterItemId);
+  const filteredAverageLabel = statsFilterItemId === 'all'
+    ? 'Gesamtdurchschnitt'
+    : `Durchschnitt fuer ${selectedFilterItem?.name || 'Auswahl'}`;
 
   const timelineEntries = [...(state.ratingEvents || [])]
     .slice(-8)
@@ -678,6 +740,12 @@ function renderStats() {
       `).join('')}
     </div>
 
+    <div class="stat-box">
+      <span class="stat-label">${filteredAverageLabel}</span>
+      <strong>${filteredAverageNumber === null ? '–' : `${filteredAverageNumber.toFixed(1)}/5`}</strong>
+      ${renderAverageStars(filteredAverageNumber, filteredAverageLabel)}
+    </div>
+
     <div class="timeline-box" aria-label="Timeline der letzten Bewertungen">
       <h4>Timeline</h4>
       ${visibleTimelineEntries.length ? `
@@ -697,6 +765,10 @@ function renderStats() {
 function render() {
   renderParticipants();
   renderActiveParticipant();
+  renderExperienceVisibility();
+  if (!state.activeParticipantId) {
+    return;
+  }
   renderItemExplorer();
   renderStats();
 }
@@ -766,6 +838,7 @@ function handleAppChange(event) {
 document.getElementById('participant-form').addEventListener('submit', handleParticipantForm);
 document.addEventListener('click', handleAppClick);
 document.addEventListener('change', handleAppChange);
+setupSwipeNavigation();
 
 render();
 loadRemoteState();
