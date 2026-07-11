@@ -101,7 +101,8 @@ const defaultState = {
   activeCategory: 'rum',
   activeItemId: null,
   ratings: {},
-  ratingEvents: []
+  ratingEvents: [],
+  comments: []
 };
 
 let stateSignature = '';
@@ -137,7 +138,8 @@ function loadState() {
       ...parsed,
       participants: parsed.participants || [],
       ratings: parsed.ratings || {},
-      ratingEvents: parsed.ratingEvents || []
+      ratingEvents: parsed.ratingEvents || [],
+      comments: parsed.comments || []
     };
 
     if (!hasLocalSelection) {
@@ -175,7 +177,8 @@ function applyRemoteState(remoteState) {
     ...state,
     participants: remoteState.participants || state.participants || [],
     ratings: remoteState.ratings || state.ratings || {},
-    ratingEvents: remoteState.ratingEvents || state.ratingEvents || []
+    ratingEvents: remoteState.ratingEvents || state.ratingEvents || [],
+    comments: remoteState.comments || state.comments || []
   };
 
   if (merged.activeParticipantId && !merged.participants.some((participant) => participant.id === merged.activeParticipantId)) {
@@ -343,6 +346,54 @@ function setRating(itemKey, rating) {
   persistLocalState();
   render();
   syncState({ ratings: state.ratings, ratingEvents: state.ratingEvents });
+}
+
+function getCommentsForItem(itemId) {
+  return (state.comments || [])
+    .filter((entry) => entry.itemId === itemId)
+    .sort((left, right) => (right.timestamp || '').localeCompare(left.timestamp || ''));
+}
+
+function addComment(itemId, text) {
+  if (!state.activeParticipantId) return;
+  const cleanText = text.trim();
+  if (!cleanText) return;
+
+  state.comments.push({
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    itemId,
+    participantId: state.activeParticipantId,
+    text: cleanText,
+    hearts: [],
+    timestamp: new Date().toISOString()
+  });
+
+  persistLocalState();
+  render();
+  syncState({ comments: state.comments });
+}
+
+function toggleCommentHeart(commentId) {
+  if (!state.activeParticipantId) return;
+
+  let changed = false;
+  state.comments = (state.comments || []).map((entry) => {
+    if (entry.id !== commentId) return entry;
+    const hearts = Array.isArray(entry.hearts) ? [...entry.hearts] : [];
+    const existingIndex = hearts.indexOf(state.activeParticipantId);
+    if (existingIndex >= 0) {
+      hearts.splice(existingIndex, 1);
+    } else {
+      hearts.push(state.activeParticipantId);
+    }
+    changed = true;
+    return { ...entry, hearts };
+  });
+
+  if (!changed) return;
+  persistLocalState();
+  render();
+  syncState({ comments: state.comments });
 }
 
 function setActiveCategory(category) {
@@ -625,6 +676,7 @@ function renderItemExplorer() {
   const itemAverage = getAverageForItem(currentItem.id);
   const itemHistogram = getHistogramForItem(currentItem.id);
   const maxValue = Math.max(...itemHistogram, 1);
+  const itemComments = getCommentsForItem(currentItem.id);
 
   document.getElementById('item-explorer').innerHTML = `
     <div class="item-switcher">
@@ -679,6 +731,34 @@ function renderItemExplorer() {
             </div>
           `).join('')}
         </div>
+      </div>
+
+      <div class="comments-box" aria-label="Kommentare für ${currentItem.name}">
+        <h4>Kommentare</h4>
+        <form id="comment-form" class="comment-form" data-item-id="${currentItem.id}">
+          <label class="sr-only" for="comment-input">Kommentar</label>
+          <input id="comment-input" name="comment" type="text" maxlength="180" placeholder="Dein Kommentar zu ${currentItem.name}" ${state.activeParticipantId ? '' : 'disabled'} />
+          <button type="submit" ${state.activeParticipantId ? '' : 'disabled'}>Senden</button>
+        </form>
+        ${itemComments.length ? `
+          <ul class="comment-list">
+            ${itemComments.map((entry) => {
+              const participant = state.participants.find((p) => p.id === entry.participantId);
+              const heartCount = Array.isArray(entry.hearts) ? entry.hearts.length : 0;
+              const didHeart = Array.isArray(entry.hearts) && entry.hearts.includes(state.activeParticipantId);
+              return `
+                <li class="comment-item">
+                  <div class="comment-head">
+                    <strong>${participant?.name || 'Unbekannt'}</strong>
+                    <span>${formatEventTime(entry.timestamp)}</span>
+                  </div>
+                  <p>${entry.text}</p>
+                  <button type="button" class="comment-heart ${didHeart ? 'active' : ''}" data-action="heart-comment" data-comment-id="${entry.id}" ${state.activeParticipantId ? '' : 'disabled'}>♥ ${heartCount}</button>
+                </li>
+              `;
+            }).join('')}
+          </ul>
+        ` : '<p class="comment-empty">Noch keine Kommentare.</p>'}
       </div>
     </article>
   `;
@@ -797,22 +877,24 @@ function renderStats() {
       </select>
     </div>
 
-    <div class="histogram" aria-label="${histogramLabel}">
-      ${histogramValues.map((count, index) => `
-        <div class="histogram-row">
-          <span>${index + 1}★</span>
-          <div class="histogram-bar">
-            <div class="histogram-fill" style="width: ${(count / maxHistogramValue) * 100}%"></div>
+    <div class="histogram-summary-grid">
+      <div class="histogram" aria-label="${histogramLabel}">
+        ${histogramValues.map((count, index) => `
+          <div class="histogram-row">
+            <span>${index + 1}★</span>
+            <div class="histogram-bar">
+              <div class="histogram-fill" style="width: ${(count / maxHistogramValue) * 100}%"></div>
+            </div>
+            <span>${count}</span>
           </div>
-          <span>${count}</span>
-        </div>
-      `).join('')}
-    </div>
+        `).join('')}
+      </div>
 
-    <div class="stat-box">
-      <span class="stat-label">${filteredAverageLabel}</span>
-      <strong>${filteredAverageNumber === null ? '–' : `${filteredAverageNumber.toFixed(1)}/5`}</strong>
-      ${renderAverageStars(filteredAverageNumber, filteredAverageLabel)}
+      <div class="stat-box histogram-average-box">
+        <span class="stat-label">${filteredAverageLabel}</span>
+        <strong>${filteredAverageNumber === null ? '–' : `${filteredAverageNumber.toFixed(1)}/5`}</strong>
+        ${renderAverageStars(filteredAverageNumber, filteredAverageLabel)}
+      </div>
     </div>
 
     <div class="timeline-box" aria-label="Timeline der letzten Bewertungen">
@@ -892,7 +974,26 @@ function handleAppClick(event) {
 
   if (button.classList.contains('star-btn') && item && rating) {
     setRating(item, Number(rating));
+    return;
   }
+
+  if (action === 'heart-comment' && button.dataset.commentId) {
+    toggleCommentHeart(button.dataset.commentId);
+  }
+}
+
+function handleDynamicFormSubmit(event) {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  if (form.id !== 'comment-form') return;
+
+  event.preventDefault();
+  const itemId = form.dataset.itemId;
+  const input = form.querySelector('input[name="comment"]');
+  if (!(input instanceof HTMLInputElement) || !itemId) return;
+
+  addComment(itemId, input.value);
+  input.value = '';
 }
 
 function handleAppChange(event) {
@@ -907,6 +1008,7 @@ function handleAppChange(event) {
 document.getElementById('participant-form').addEventListener('submit', handleParticipantForm);
 document.addEventListener('click', handleAppClick);
 document.addEventListener('change', handleAppChange);
+document.addEventListener('submit', handleDynamicFormSubmit);
 setupSwipeNavigation();
 
 render();

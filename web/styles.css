@@ -346,6 +346,92 @@ textarea {
   margin-top: 12px;
 }
 
+.comments-box {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.comments-box h4 {
+  margin: 0 0 8px;
+}
+
+.comment-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.comment-form input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 9px 10px;
+}
+
+.comment-form button {
+  border: none;
+  border-radius: 10px;
+  background: rgba(225, 166, 75, 0.22);
+  color: var(--accent-strong);
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.comment-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.comment-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.comment-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.comment-item p {
+  margin: 6px 0;
+}
+
+.comment-heart {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.comment-heart.active {
+  border-color: rgba(255, 90, 120, 0.8);
+  color: #ff8ca5;
+  background: rgba(255, 90, 120, 0.14);
+}
+
+.comment-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
 .stats-grid {
   display: grid;
   gap: 10px;
@@ -491,6 +577,19 @@ textarea {
   gap: 8px;
 }
 
+.histogram-summary-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1.6fr 1fr;
+  margin-bottom: 10px;
+}
+
+.histogram-average-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .histogram-row {
   display: grid;
   grid-template-columns: 34px 1fr 40px;
@@ -531,6 +630,10 @@ textarea {
 
 @media (max-width: 700px) {
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .histogram-summary-grid {
     grid-template-columns: 1fr;
   }
 
