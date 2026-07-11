@@ -417,6 +417,30 @@ textarea {
   margin-bottom: 10px;
 }
 
+.stats-filter-box {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  margin-bottom: 10px;
+}
+
+.stats-filter-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+}
+
+.stats-filter-select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 .timeline-box {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -502,5 +526,16 @@ textarea {
 @media (min-width: 700px) {
   .item-stats {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dual-star-row {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }

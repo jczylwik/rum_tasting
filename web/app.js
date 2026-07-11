@@ -109,6 +109,7 @@ let eventSource = null;
 let pollTimer = null;
 let loadingRemoteState = false;
 let isParticipantPanelOpen = !state.activeParticipantId;
+let statsFilterItemId = 'all';
 
 
 function buildStateSignature(inputState) {
@@ -148,8 +149,8 @@ function applyRemoteState(remoteState) {
     ratingEvents: remoteState.ratingEvents || state.ratingEvents || []
   };
 
-  if (!merged.participants.some((participant) => participant.id === merged.activeParticipantId)) {
-    merged.activeParticipantId = merged.participants[0]?.id || null;
+  if (merged.activeParticipantId && !merged.participants.some((participant) => participant.id === merged.activeParticipantId)) {
+    merged.activeParticipantId = null;
   }
 
   const activeItems = catalog[merged.activeCategory] || [];
@@ -429,6 +430,15 @@ function toggleParticipantPanel() {
   render();
 }
 
+function setStatsFilterItem(itemId) {
+  const allItems = Object.values(catalog).flat();
+  if (itemId !== 'all' && !allItems.some((item) => item.id === itemId)) {
+    return;
+  }
+  statsFilterItemId = itemId;
+  renderStats();
+}
+
 function renderParticipantPanelVisibility() {
   const section = document.getElementById('participant-section');
   const button = document.getElementById('active-participant');
@@ -553,8 +563,6 @@ function renderStats() {
   const overallAverageNumber = overallAverage === '–' ? null : Number(overallAverage);
   const rumAverage = getAverageForCategory('rum');
   const cigarAverage = getAverageForCategory('cigar');
-  const overallHistogram = getOverallHistogram();
-  const maxValue = Math.max(...overallHistogram, 1);
   const mostRated = Object.values(catalog).flat().map((item) => ({
     item,
     votes: getVotesForItem(item.id).length
@@ -576,6 +584,18 @@ function renderStats() {
     return acc;
   }, {});
 
+  const allItems = Object.values(catalog).flat();
+  const selectedFilterItem = allItems.find((item) => item.id === statsFilterItemId) || null;
+  if (statsFilterItemId !== 'all' && !selectedFilterItem) {
+    statsFilterItemId = 'all';
+  }
+
+  const histogramValues = statsFilterItemId === 'all' ? getOverallHistogram() : getHistogramForItem(statsFilterItemId);
+  const maxHistogramValue = Math.max(...histogramValues, 1);
+  const histogramLabel = statsFilterItemId === 'all'
+    ? 'Histogramm der Gesamtbewertungen'
+    : `Histogramm fuer ${selectedFilterItem?.name || 'Auswahl'}`;
+
   const timelineEntries = [...(state.ratingEvents || [])]
     .slice(-8)
     .reverse()
@@ -583,12 +603,17 @@ function renderStats() {
       const participant = state.participants.find((entry) => entry.id === event.participantId);
       const item = itemById[event.itemId];
       return {
+        itemId: event.itemId,
         when: formatEventTime(event.timestamp),
         participantName: participant?.name || 'Unbekannt',
         itemName: item?.name || event.itemId,
         rating: event.rating
       };
     });
+
+  const visibleTimelineEntries = statsFilterItemId === 'all'
+    ? timelineEntries
+    : timelineEntries.filter((entry) => entry.itemId === statsFilterItemId);
 
   document.getElementById('stats-panel').innerHTML = `
     <div class="stats-grid">
@@ -622,36 +647,49 @@ function renderStats() {
         <small>${strictest ? `${strictest.average.toFixed(1)}/5 im Schnitt` : 'Sobald mehrere Bewertungen vorliegen.'}</small>
       </div>
       <div class="stat-box">
-        <span class="stat-label">Groesster Geniesser</span>
+        <span class="stat-label">Größter Genießer</span>
         <strong>${kindest ? kindest.participant.name : 'Noch keine Daten'}</strong>
         <small>${kindest ? `${kindest.average.toFixed(1)}/5 im Schnitt` : 'Sobald mehrere Bewertungen vorliegen.'}</small>
       </div>
     </div>
 
-    <div class="timeline-box" aria-label="Timeline der letzten Bewertungen">
-      <h4>Timeline: Wer hat wann wie bewertet?</h4>
-      ${timelineEntries.length ? `
-        <ul class="timeline-list">
-          ${timelineEntries.map((entry) => `
-            <li>
-              <span class="timeline-time">${entry.when}</span>
-              <span class="timeline-text"><strong>${entry.participantName}</strong> gab <strong>${entry.rating}/5</strong> fuer ${entry.itemName}</span>
-            </li>
-          `).join('')}
-        </ul>
-      ` : '<p class="timeline-empty">Noch keine Bewertungen in der Timeline.</p>'}
+    <div class="stats-filter-box">
+      <label class="stats-filter-label" for="stats-item-filter">Filter</label>
+      <select id="stats-item-filter" data-action="stats-filter" class="stats-filter-select">
+        <option value="all" ${statsFilterItemId === 'all' ? 'selected' : ''}>Alle Rums & Zigarren</option>
+        <optgroup label="Rums">
+          ${catalog.rum.map((item) => `<option value="${item.id}" ${statsFilterItemId === item.id ? 'selected' : ''}>${item.name}</option>`).join('')}
+        </optgroup>
+        <optgroup label="Zigarren">
+          ${catalog.cigar.map((item) => `<option value="${item.id}" ${statsFilterItemId === item.id ? 'selected' : ''}>${item.name}</option>`).join('')}
+        </optgroup>
+      </select>
     </div>
 
-    <div class="histogram" aria-label="Histogramm der Gesamtbewertungen">
-      ${overallHistogram.map((count, index) => `
+    <div class="histogram" aria-label="${histogramLabel}">
+      ${histogramValues.map((count, index) => `
         <div class="histogram-row">
           <span>${index + 1}★</span>
           <div class="histogram-bar">
-            <div class="histogram-fill" style="width: ${(count / maxValue) * 100}%"></div>
+            <div class="histogram-fill" style="width: ${(count / maxHistogramValue) * 100}%"></div>
           </div>
           <span>${count}</span>
         </div>
       `).join('')}
+    </div>
+
+    <div class="timeline-box" aria-label="Timeline der letzten Bewertungen">
+      <h4>Timeline</h4>
+      ${visibleTimelineEntries.length ? `
+        <ul class="timeline-list">
+          ${visibleTimelineEntries.map((entry) => `
+            <li>
+              <span class="timeline-time">${entry.when}</span>
+              <span class="timeline-text"><strong>${entry.participantName}</strong> gab <strong>${entry.rating}/5</strong> für ${entry.itemName}</span>
+            </li>
+          `).join('')}
+        </ul>
+      ` : '<p class="timeline-empty">Noch keine passenden Bewertungen in der Timeline.</p>'}
     </div>
   `;
 }
@@ -716,8 +754,18 @@ function handleAppClick(event) {
   }
 }
 
+function handleAppChange(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement)) return;
+
+  if (target.dataset.action === 'stats-filter') {
+    setStatsFilterItem(target.value);
+  }
+}
+
 document.getElementById('participant-form').addEventListener('submit', handleParticipantForm);
 document.addEventListener('click', handleAppClick);
+document.addEventListener('change', handleAppChange);
 
 render();
 loadRemoteState();
