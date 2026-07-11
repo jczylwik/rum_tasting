@@ -139,10 +139,20 @@ function persistLocalState() {
 function applyRemoteState(remoteState) {
   const merged = {
     ...defaultState,
-    ...remoteState,
-    participants: remoteState.participants || [],
-    ratings: remoteState.ratings || {}
+    ...state,
+    participants: remoteState.participants || state.participants || [],
+    ratings: remoteState.ratings || state.ratings || {}
   };
+
+  if (!merged.participants.some((participant) => participant.id === merged.activeParticipantId)) {
+    merged.activeParticipantId = merged.participants[0]?.id || null;
+  }
+
+  const activeItems = catalog[merged.activeCategory] || [];
+  if (!activeItems.some((item) => item.id === merged.activeItemId)) {
+    merged.activeItemId = activeItems[0]?.id || null;
+  }
+
   const nextSignature = buildStateSignature(merged);
   if (nextSignature === stateSignature) {
     return;
@@ -153,12 +163,12 @@ function applyRemoteState(remoteState) {
   render();
 }
 
-async function syncState() {
+async function syncState(partialState) {
   try {
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(state)
+      body: JSON.stringify(partialState)
     });
     if (!response.ok) {
       throw new Error('sync failed');
@@ -238,7 +248,7 @@ function addParticipant(name) {
   if (existing) {
     state.activeParticipantId = existing.id;
     persistLocalState();
-    syncState();
+    syncState({ participants: state.participants, ratings: state.ratings });
     return;
   }
 
@@ -247,13 +257,12 @@ function addParticipant(name) {
   state.activeParticipantId = participant.id;
   state.ratings[participant.id] = {};
   persistLocalState();
-  syncState();
+  syncState({ participants: state.participants, ratings: state.ratings });
 }
 
 function setActiveParticipant(id) {
   state.activeParticipantId = id;
   persistLocalState();
-  syncState();
 }
 
 function removeParticipant(id) {
@@ -263,7 +272,7 @@ function removeParticipant(id) {
     state.activeParticipantId = state.participants[0]?.id || null;
   }
   persistLocalState();
-  syncState();
+  syncState({ participants: state.participants, ratings: state.ratings });
 }
 
 function setRating(itemKey, rating) {
@@ -273,7 +282,7 @@ function setRating(itemKey, rating) {
   }
   state.ratings[state.activeParticipantId][itemKey] = rating;
   persistLocalState();
-  syncState();
+  syncState({ ratings: state.ratings });
 }
 
 function setActiveCategory(category) {
@@ -283,7 +292,6 @@ function setActiveCategory(category) {
     state.activeItemId = items[0]?.id || null;
   }
   persistLocalState();
-  syncState();
 }
 
 function changeItem(direction) {
@@ -293,7 +301,6 @@ function changeItem(direction) {
   const nextIndex = (currentIndex + direction + items.length) % items.length;
   state.activeItemId = items[nextIndex].id;
   persistLocalState();
-  syncState();
 }
 
 function getCurrentItem() {
