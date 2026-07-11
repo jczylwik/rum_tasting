@@ -555,6 +555,18 @@ startRealtimeUpdates();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    let hasReloadedForSw = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hasReloadedForSw) return;
+      hasReloadedForSw = true;
+      window.location.reload();
+    });
+
+    navigator.serviceWorker.register('./sw.js').then((registration) => {
+      registration.update().catch(() => {});
+      if (registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+    }).catch(() => {});
   });
 }
