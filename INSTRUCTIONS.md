@@ -11,6 +11,7 @@ Die App soll ein einfaches, mobiles Rum- und Zigarren-Tasting für kleine Gruppe
 - Änderungen an den Datenfeldern müssen immer in Frontend und Backend konsistent sein.
 - Der Python-Server soll über app.py gestartet werden, damit Azure/App Service ihn direkt ausführen kann.
 - Erweiterte Statistiken sind optional einblendbar und müssen filterbasiert berechnet werden.
+- Benutzerdefinierte Rum-Einträge müssen über den gemeinsamen State (`customRums`) synchronisiert werden.
 
 ## Wichtige Dateien
 

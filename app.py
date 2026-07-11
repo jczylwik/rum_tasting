@@ -20,6 +20,7 @@ DEFAULT_STATE = {
     'activeItemId': None,
     'ratingEvents': [],
     'comments': [],
+    'customRums': [],
 }
 
 
@@ -36,6 +37,7 @@ def load_state():
         'ratings': loaded.get('ratings') or {},
         'ratingEvents': loaded.get('ratingEvents') or [],
         'comments': loaded.get('comments') or [],
+        'customRums': loaded.get('customRums') or [],
     }
 
 
@@ -175,6 +177,8 @@ class Handler(BaseHTTPRequestHandler):
             state['ratingEvents'] = payload['ratingEvents']
         if 'comments' in payload:
             state['comments'] = payload['comments']
+        if 'customRums' in payload:
+            state['customRums'] = payload['customRums']
         save_state(state)
         broadcast_state_event()
         self._send_json(state)

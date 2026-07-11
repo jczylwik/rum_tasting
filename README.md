@@ -6,6 +6,7 @@ This is a mobile-friendly live tasting app for rum and cigars. It supports parti
 
 - Add and select participants
 - Rum and cigar catalog with item details
+- Add custom rum entries directly in the UI (optional detail fields)
 - 1 to 5 star ratings
 - Live comments with heart reactions per item
 - Average score and histogram per item and overall
@@ -85,6 +86,7 @@ The data structure includes at least:
 - activeItemId
 - ratingEvents
 - comments
+- customRums
 
 ## Development Notes
 

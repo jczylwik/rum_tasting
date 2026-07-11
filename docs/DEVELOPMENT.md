@@ -36,7 +36,9 @@ You can verify the app locally using these URLs:
 
 - Real-time sync uses `GET /api/events` (SSE) with polling fallback.
 - Shared state fields include `participants`, `ratings`, `ratingEvents`, and `comments`.
+- Shared state fields include `participants`, `ratings`, `ratingEvents`, `comments`, and `customRums`.
 - Per-device UX preferences are stored in localStorage, for example:
 	- participant selection marker
 	- advanced statistics visibility toggle
 - The advanced stats section is intentionally filter-aware (single item/category/all). When touching `renderStats()`, keep filtered and overall calculations separate.
+- Custom rum entries are created in the frontend and synchronized through `/api/state` so they appear on all devices and in filter/statistics views.

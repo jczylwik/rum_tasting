@@ -5,7 +5,7 @@ const API_URL = '/api/state';
 const EVENTS_URL = '/api/events';
 const FALLBACK_POLL_INTERVAL_MS = 2500;
 
-const catalog = {
+const baseCatalog = {
   rum: [
     {
       id: 'ron-abuelo',
@@ -122,7 +122,8 @@ const defaultState = {
   activeItemId: null,
   ratings: {},
   ratingEvents: [],
-  comments: []
+  comments: [],
+  customRums: []
 };
 
 let stateSignature = '';
@@ -144,6 +145,43 @@ const FILTER_ALL = 'all';
 const FILTER_ALL_RUM = 'all-rum';
 const FILTER_ALL_CIGAR = 'all-cigar';
 
+function getCatalog() {
+  return {
+    rum: [...baseCatalog.rum, ...(state.customRums || [])],
+    cigar: baseCatalog.cigar
+  };
+}
+
+function normalizeCustomRum(input) {
+  if (!input || typeof input !== 'object') return null;
+  const name = String(input.name || '').trim();
+  if (!name) return null;
+
+  const detailsInput = input.details && typeof input.details === 'object' ? input.details : {};
+  const details = Object.entries(detailsInput).reduce((acc, [label, value]) => {
+    const cleanLabel = String(label || '').trim();
+    const cleanValue = String(value || '').trim();
+    if (cleanLabel && cleanValue) {
+      acc[cleanLabel] = cleanValue;
+    }
+    return acc;
+  }, {});
+
+  return {
+    id: String(input.id || `custom-rum-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`),
+    name,
+    description: String(input.description || '').trim() || 'Benutzerdefinierter Rum',
+    details
+  };
+}
+
+function normalizeCustomRums(input) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((entry) => normalizeCustomRum(entry))
+    .filter((entry) => entry !== null);
+}
+
 
 function buildStateSignature(inputState) {
   return JSON.stringify(inputState);
@@ -160,7 +198,8 @@ function loadState() {
       participants: parsed.participants || [],
       ratings: parsed.ratings || {},
       ratingEvents: parsed.ratingEvents || [],
-      comments: parsed.comments || []
+      comments: parsed.comments || [],
+      customRums: normalizeCustomRums(parsed.customRums)
     };
 
     if (!hasLocalSelection) {
@@ -199,7 +238,8 @@ function applyRemoteState(remoteState) {
     participants: remoteState.participants || state.participants || [],
     ratings: remoteState.ratings || state.ratings || {},
     ratingEvents: remoteState.ratingEvents || state.ratingEvents || [],
-    comments: remoteState.comments || state.comments || []
+    comments: remoteState.comments || state.comments || [],
+    customRums: normalizeCustomRums(remoteState.customRums || state.customRums || [])
   };
 
   if (merged.activeParticipantId && !merged.participants.some((participant) => participant.id === merged.activeParticipantId)) {
@@ -210,7 +250,11 @@ function applyRemoteState(remoteState) {
     merged.activeParticipantId = null;
   }
 
-  const activeItems = catalog[merged.activeCategory] || [];
+  const mergedCatalog = {
+    rum: [...baseCatalog.rum, ...(merged.customRums || [])],
+    cigar: baseCatalog.cigar
+  };
+  const activeItems = mergedCatalog[merged.activeCategory] || [];
   if (!activeItems.some((item) => item.id === merged.activeItemId)) {
     merged.activeItemId = activeItems[0]?.id || null;
   }
@@ -419,7 +463,7 @@ function toggleCommentHeart(commentId) {
 
 function setActiveCategory(category) {
   state.activeCategory = category;
-  const items = catalog[category];
+  const items = getCatalog()[category];
   if (!items.some((item) => item.id === state.activeItemId)) {
     state.activeItemId = items[0]?.id || null;
   }
@@ -428,7 +472,7 @@ function setActiveCategory(category) {
 }
 
 function changeItem(direction) {
-  const items = catalog[state.activeCategory];
+  const items = getCatalog()[state.activeCategory];
   if (!items.length) return;
   const currentIndex = items.findIndex((item) => item.id === state.activeItemId);
   const nextIndex = (currentIndex + direction + items.length) % items.length;
@@ -438,12 +482,24 @@ function changeItem(direction) {
 }
 
 function getCurrentItem() {
-  const items = catalog[state.activeCategory];
+  const items = getCatalog()[state.activeCategory];
   const item = items.find((entry) => entry.id === state.activeItemId) || items[0];
   if (!state.activeItemId && item) {
     state.activeItemId = item.id;
   }
   return item;
+}
+
+function addCustomRum(payload) {
+  const normalized = normalizeCustomRum(payload);
+  if (!normalized) return;
+
+  state.customRums = [...(state.customRums || []), normalized];
+  state.activeCategory = 'rum';
+  state.activeItemId = normalized.id;
+  persistLocalState();
+  render();
+  syncState({ customRums: state.customRums });
 }
 
 function getVotesForItem(itemId) {
@@ -464,7 +520,7 @@ function getAverageNumberForItem(itemId) {
 }
 
 function getAverageForCategory(category) {
-  const items = catalog[category] || [];
+  const items = getCatalog()[category] || [];
   const values = items.flatMap((item) => getVotesForItem(item.id));
   if (!values.length) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -495,7 +551,7 @@ function getHistogramForItem(itemId) {
 }
 
 function getOverallHistogram() {
-  const allItems = Object.values(catalog).flat();
+  const allItems = Object.values(getCatalog()).flat();
   const histogram = [0, 0, 0, 0, 0];
   state.participants.forEach((participant) => {
     allItems.forEach((item) => {
@@ -509,7 +565,7 @@ function getOverallHistogram() {
 }
 
 function getOverallAverage() {
-  const allItems = Object.values(catalog).flat();
+  const allItems = Object.values(getCatalog()).flat();
   const values = state.participants.flatMap((participant) => {
     return allItems
       .map((item) => state.ratings[participant.id]?.[item.id])
@@ -519,7 +575,7 @@ function getOverallAverage() {
 }
 
 function getAllRatings() {
-  const allItems = Object.values(catalog).flat();
+  const allItems = Object.values(getCatalog()).flat();
   return state.participants.flatMap((participant) => {
     return allItems
       .map((item) => state.ratings[participant.id]?.[item.id])
@@ -626,6 +682,7 @@ function setupSwipeNavigation() {
 }
 
 function setStatsFilterItem(itemId) {
+  const catalog = getCatalog();
   const allItems = Object.values(catalog).flat();
   const isCategoryFilter = itemId === FILTER_ALL_RUM || itemId === FILTER_ALL_CIGAR;
   if (itemId !== FILTER_ALL && !isCategoryFilter && !allItems.some((item) => item.id === itemId)) {
@@ -646,6 +703,7 @@ function toggleAdvancedStatsVisibility() {
 }
 
 function getFilteredItemIds() {
+  const catalog = getCatalog();
   if (statsFilterItemId === FILTER_ALL) {
     return Object.values(catalog).flat().map((item) => item.id);
   }
@@ -752,6 +810,7 @@ function renderItemExplorer() {
     return;
   }
 
+  const catalog = getCatalog();
   const items = catalog[state.activeCategory];
   const currentIndex = items.findIndex((item) => item.id === currentItem.id) + 1;
   const currentRating = state.activeParticipantId ? state.ratings[state.activeParticipantId]?.[currentItem.id] : null;
@@ -774,17 +833,37 @@ function renderItemExplorer() {
       </div>
     </div>
 
+    ${state.activeCategory === 'rum' ? `
+      <details class="add-rum-details">
+        <summary>Neuen Rum hinzufügen</summary>
+        <form id="add-rum-form" class="add-rum-form">
+          <input name="name" type="text" placeholder="Name (Pflichtfeld)" maxlength="80" required />
+          <input name="description" type="text" placeholder="Kurzbeschreibung (optional)" maxlength="160" />
+          <input name="origin" type="text" placeholder="Herkunft (optional)" maxlength="60" />
+          <input name="producer" type="text" placeholder="Produzent (optional)" maxlength="80" />
+          <input name="rawMaterial" type="text" placeholder="Rohstoff (optional)" maxlength="60" />
+          <input name="distillation" type="text" placeholder="Destillation (optional)" maxlength="80" />
+          <input name="age" type="text" placeholder="Alter (optional)" maxlength="60" />
+          <input name="abv" type="text" placeholder="Alkohol (optional)" maxlength="40" />
+          <input name="aroma" type="text" placeholder="Aromen (optional)" maxlength="120" />
+          <input name="character" type="text" placeholder="Charakter (optional)" maxlength="120" />
+          <input name="pairing" type="text" placeholder="Pairing (optional)" maxlength="120" />
+          <button type="submit">Rum hinzufügen</button>
+        </form>
+      </details>
+    ` : ''}
+
     <article class="item-card">
       <p class="item-badge">${state.activeCategory === 'rum' ? 'Rum' : 'Zigarre'}</p>
       <h3>${currentItem.name}</h3>
       <p class="item-description">${currentItem.description}</p>
       <div class="item-meta">
-        ${Object.entries(currentItem.details).map(([label, value]) => `
+        ${Object.entries(currentItem.details || {}).map(([label, value]) => `
           <div class="meta-row">
             <span>${label}</span>
             <strong>${value}</strong>
           </div>
-        `).join('')}
+        `).join('') || '<p class="item-description">Keine weiteren Detailinfos hinterlegt.</p>'}
       </div>
 
       <div class="rating-box">
@@ -848,6 +927,7 @@ function renderItemExplorer() {
 }
 
 function renderStats() {
+  const catalog = getCatalog();
   const overallAverage = getOverallAverage();
   const overallAverageNumber = overallAverage === '–' ? null : Number(overallAverage);
   const mostRated = Object.values(catalog).flat().map((item) => ({
@@ -1137,15 +1217,38 @@ function handleAppClick(event) {
 function handleDynamicFormSubmit(event) {
   const form = event.target;
   if (!(form instanceof HTMLFormElement)) return;
-  if (form.id !== 'comment-form') return;
+  if (form.id === 'comment-form') {
+    event.preventDefault();
+    const itemId = form.dataset.itemId;
+    const input = form.querySelector('input[name="comment"]');
+    if (!(input instanceof HTMLInputElement) || !itemId) return;
+
+    addComment(itemId, input.value);
+    input.value = '';
+    return;
+  }
+  if (form.id !== 'add-rum-form') return;
 
   event.preventDefault();
-  const itemId = form.dataset.itemId;
-  const input = form.querySelector('input[name="comment"]');
-  if (!(input instanceof HTMLInputElement) || !itemId) return;
+  const formData = new FormData(form);
+  const name = String(formData.get('name') || '').trim();
+  if (!name) return;
 
-  addComment(itemId, input.value);
-  input.value = '';
+  const description = String(formData.get('description') || '').trim();
+  const details = {
+    ...(String(formData.get('origin') || '').trim() ? { Herkunft: String(formData.get('origin')).trim() } : {}),
+    ...(String(formData.get('producer') || '').trim() ? { Produzent: String(formData.get('producer')).trim() } : {}),
+    ...(String(formData.get('rawMaterial') || '').trim() ? { Rohstoff: String(formData.get('rawMaterial')).trim() } : {}),
+    ...(String(formData.get('distillation') || '').trim() ? { Destillation: String(formData.get('distillation')).trim() } : {}),
+    ...(String(formData.get('age') || '').trim() ? { Alter: String(formData.get('age')).trim() } : {}),
+    ...(String(formData.get('abv') || '').trim() ? { Alkohol: String(formData.get('abv')).trim() } : {}),
+    ...(String(formData.get('aroma') || '').trim() ? { Aromen: String(formData.get('aroma')).trim() } : {}),
+    ...(String(formData.get('character') || '').trim() ? { Charakter: String(formData.get('character')).trim() } : {}),
+    ...(String(formData.get('pairing') || '').trim() ? { Pairing: String(formData.get('pairing')).trim() } : {})
+  };
+
+  addCustomRum({ name, description, details });
+  form.reset();
 }
 
 function handleAppChange(event) {

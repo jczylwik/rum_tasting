@@ -22,6 +22,7 @@ The shared state includes:
 - activeItemId: currently selected item
 - ratingEvents: recent rating activity for timeline views
 - comments: item-bound comments with heart reactions
+- customRums: user-created rum entries with optional metadata
 
 ## Key Components
 
