@@ -1,24 +1,24 @@
 # Azure-Deployment
 
-## Ziel
+## Goal
 
-Die App wurde so vorbereitet, dass sie auf Azure App Service als Python-Web-App laufen kann.
+The app is prepared to run on Azure App Service as a Python web app.
 
-## Wichtige Konfiguration
+## Key Configuration
 
-- Python-Laufzeit: 3.10
-- Startpunkt: python app.py
-- Port: über die Umgebungsvariable PORT
-- App-Service-Startdatei: startup.sh und web.config sind vorbereitet
+- Python runtime: 3.10
+- Entry point: python app.py
+- Port: provided through the PORT environment variable
+- App Service startup files: startup.sh and web.config are included
 
-## Deployment-Schritte
+## Deployment Steps
 
-1. App Service erstellen oder verwenden
-2. Python-Runtime auf 3.10 setzen
-3. Startbefehl auf `bash startup.sh` setzen (alternativ direkt `python app.py`)
-4. Projekt als ZIP deployen oder über Azure CLI veröffentlichen
+1. Create or reuse an App Service.
+2. Set the Python runtime to 3.10.
+3. Set startup command to `bash startup.sh` (or directly `python app.py`).
+4. Deploy the project as ZIP or publish through Azure CLI.
 
-### Azure CLI (empfohlen)
+### Azure CLI (recommended)
 
 ```powershell
 az webapp config set --resource-group <RG> --name <APP_NAME> --startup-file "bash startup.sh"
@@ -27,43 +27,43 @@ az webapp restart --resource-group <RG> --name <APP_NAME>
 az webapp log tail --resource-group <RG> --name <APP_NAME>
 ```
 
-Health Check in App Service aktivieren:
+Enable Health Check in App Service:
 
 ```powershell
 az webapp update --resource-group <RG> --name <APP_NAME> --set siteConfig.healthCheckPath=/healthz
 ```
 
-Hinweis: `az webapp config set --generic-configurations` kann unter PowerShell/Windows JSON-Parserfehler ausloesen. `az webapp update --set ...` ist in diesem Projekt der stabile Weg.
+Note: `az webapp config set --generic-configurations` can trigger JSON parsing errors under PowerShell/Windows. In this project, `az webapp update --set ...` is the stable option.
 
-Wenn `startup.sh` nicht verwendet werden soll:
+If `startup.sh` is not used:
 
 ```powershell
 az webapp config set --resource-group <RG> --name <APP_NAME> --startup-file "python app.py"
 ```
 
-## Häufige Probleme
+## Common Issues
 
-- Application Error: oft ein Startproblem der Python-App oder falscher Startup-Command
-- 403/Stopped: die Web-App ist nicht gestartet oder der Plan hat ein Problem
-- QuotaExceeded: der verwendete App-Service-Plan ist nicht mehr ausreichend oder blockiert
+- Application Error: usually a Python startup issue or an incorrect startup command
+- 403/Stopped: the web app is not started or the plan has a problem
+- QuotaExceeded: the App Service plan is out of capacity or blocked by plan limits
 
-## Praktische Hinweise
+## Practical Notes
 
-- Lokal zuerst mit python app.py testen, bevor der Deploy auf Azure erfolgt.
-- Bei Problemen zuerst den Startbefehl und den Port-Mechanismus prüfen.
-- Der Server bindet auf `0.0.0.0` und nutzt `PORT` aus der Azure-Umgebung.
-- Für Verfügbarkeitsprüfungen steht `GET /healthz` zur Verfügung.
-- Die App verwendet keine Datenbank; die persistente JSON-Datei ist der einfache Shared-State.
+- Test locally with `python app.py` before deploying to Azure.
+- If issues occur, first verify startup command and port handling.
+- The server binds to `0.0.0.0` and reads `PORT` from the Azure environment.
+- `GET /healthz` is available for availability checks.
+- The app does not use a database; persistent JSON storage provides shared state.
 
-## Verifizierte Zielkonfiguration (Stand 2026-07-11)
+## Verified Target Configuration (as of 2026-07-11)
 
 - App Service Runtime: `PYTHON|3.10`
 - Startup Command: `python app.py`
 - Health Check Path: `/healthz`
 - App State: `Running`
-- Wenn `QuotaExceeded` auftritt, einen kostenpflichtigen Plan verwenden (z. B. B1) oder Apps auf dem Free-Plan reduzieren.
+- If `QuotaExceeded` appears, use a paid plan (for example B1) or reduce apps on the Free plan.
 
-## PowerShell-Hinweise fuer stabile CLI-Ausfuehrung
+## PowerShell Notes for Stable CLI Execution
 
-- Azure-Kommandos in PowerShell als Einzeiler ausfuehren (keine Zeilenfortsetzung mit Backticks), um Terminal-Artefakte wie `^U` zu vermeiden.
-- Wenn `az` nicht gefunden wird, zuerst mit `Get-Command az` oder `where.exe az` pruefen.
+- Run Azure commands in PowerShell as single-line commands (no backtick line continuations) to avoid terminal artifacts like `^U`.
+- If `az` is not found, check with `Get-Command az` or `where.exe az` first.

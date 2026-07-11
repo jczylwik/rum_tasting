@@ -1,35 +1,35 @@
-# Projektüberblick
+# Project Overview
 
-## Zweck
+## Purpose
 
-Die App wurde als einfache gemeinsame Tasting-Plattform entwickelt. Mehrere Teilnehmer können an einem Gerät oder mehreren Geräten ihre Namen eintragen und Bewertungen für verschiedene Rum- und Zigarren-Objekte abgeben.
+The app was built as a lightweight shared tasting platform. Multiple participants can enter their names on one or more devices and submit ratings for different rum and cigar items.
 
-## Architektur
+## Architecture
 
-- Frontend: HTML, CSS und JavaScript in einer einzelnen, responsiven Web-App
-- Backend: einfacher Python-HTTP-Server mit GET/POST-Endpunkten
-- State: JSON-Datei im Projektordner, die von mehreren Clients geteilt wird
-- Optional: Progressive Web App mit Manifest und Service Worker
+- Frontend: HTML, CSS, and JavaScript in a single responsive web app
+- Backend: simple Python HTTP server with GET and POST endpoints
+- State: JSON file in the project directory shared by multiple clients
+- Optional: Progressive Web App support via manifest and service worker
 
-## Datenmodell
+## Data Model
 
-Der gemeinsame Zustand enthält:
+The shared state includes:
 
-- participants: Liste der Teilnehmer
-- ratings: Bewertungen je Teilnehmer und Objekt
-- activeParticipantId: aktuell ausgewählter Teilnehmer
-- activeCategory: aktuelle Kategorie (Rum oder Zigarren)
-- activeItemId: aktuell ausgewähltes Objekt
+- participants: list of participants
+- ratings: ratings per participant and item
+- activeParticipantId: currently selected participant
+- activeCategory: current category (rum or cigars)
+- activeItemId: currently selected item
 
-## Wichtige Komponenten
+## Key Components
 
-- web/app.js: verwaltet Katalog, State, Ratings, Rendern und Synchronisation
-- app.py: stellt den State über /api/state bereit und serviert statische Dateien
-- data.json: Dateibasiertes Persistenzmodell für die gemeinsame Nutzung
-- legacy/print/: separater Bereich fuer die alte reine Rum-Tasting-Print-Funktion
+- web/app.js: manages catalog data, app state, ratings, rendering, and synchronization
+- app.py: exposes shared state at /api/state and serves static files
+- data.json: file-based persistence model for shared usage
+- legacy/print/: separate area for the old pure rum tasting print feature
 
-## Besonderheiten
+## Notable Characteristics
 
-- Die App ist bewusst leichtgewichtig gehalten und benötigt keine komplexe Datenbank.
-- Die Synchronisation ist simpel und basiert auf JSON-Requests statt auf einer echten Backend-Datenbank.
-- Für Azure wurde ein Python-Entry-Point und eine einfache App-Service-Konfiguration vorbereitet.
+- The app is intentionally lightweight and does not require a complex database.
+- Synchronization is intentionally simple and uses JSON requests instead of a full database backend.
+- A Python entry point and straightforward App Service configuration are prepared for Azure deployment.

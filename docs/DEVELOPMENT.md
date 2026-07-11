@@ -1,11 +1,11 @@
-# Entwicklungshinweise
+# Development Notes
 
-## Voraussetzungen
+## Requirements
 
-- Python 3.10 oder neuer
-- optional: virtuelle Umgebung
+- Python 3.10 or newer
+- Optional: virtual environment
 
-## Lokale Ausführung
+## Run Locally
 
 ```powershell
 py -m venv venv
@@ -13,21 +13,21 @@ py -m venv venv
 python app.py
 ```
 
-Danach im Browser öffnen:
+Then open in your browser:
 
 - http://127.0.0.1:8000/
 
-## Tests
+## Local Checks
 
-Die App kann lokal über die folgenden URL-Strukturen geprüft werden:
+You can verify the app locally using these URLs:
 
-- http://127.0.0.1:8000/ liefert die Hauptseite
-- http://127.0.0.1:8000/api/state liefert den aktuellen State als JSON
+- http://127.0.0.1:8000/ serves the main page
+- http://127.0.0.1:8000/api/state returns the current shared state as JSON
 
-## Hinweise
+## Notes
 
-- app.py ist der vorgesehene und einzige Server-Einstiegspunkt.
-- Das Frontend liegt unter `web/`.
-- Wenn die App im Browser lokal nicht synchronisiert, ist meist der API-Endpoint oder die JSON-Speicherung betroffen.
-- Für neue Features sollte zuerst geprüft werden, ob der State-Format erweitert werden muss.
-- Die alte Print-Funktion bleibt unter `legacy/print/` erhalten und kann mit `python legacy/print/build_rum_tasting.py` gebaut werden.
+- app.py is the intended and only backend entry point.
+- The frontend is located under `web/`.
+- If local browser synchronization fails, the API endpoint or JSON persistence is usually the issue.
+- For new features, first check whether the state format must be extended.
+- The old print feature remains under `legacy/print/` and can be built with `python legacy/print/build_rum_tasting.py`.

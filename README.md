@@ -1,25 +1,25 @@
-# Rum Tasting & Zigarren
+# Rum Tasting & Cigars
 
-Dies ist eine mobile, einfache Tasting-App für Rum und Zigarren. Sie unterstützt Teilnehmer-Eingabe, schnelle Bewertungen mit Sternen, einfache Statistiken und eine gemeinsame Datenhaltung über eine kleine Python-Backend-Schicht.
+This is a simple, mobile-friendly tasting app for rum and cigars. It supports participant input, quick star ratings, lightweight statistics, and shared state through a small Python backend layer.
 
-## Funktionen
+## Features
 
-- Teilnehmer hinzufügen und auswählen
-- Rum- und Zigarren-Katalog mit Infos pro Objekt
-- 1–5-Sterne-Bewertungen
-- Durchschnitt und Histogramm pro Objekt sowie gesamt
-- Gemeinsame Speicherung über die API unter /api/state
-- Installierbare Progressive Web App (PWA)
-- Azure-App-Service-Deployment vorbereitet
+- Add and select participants
+- Rum and cigar catalog with item details
+- 1 to 5 star ratings
+- Average score and histogram per item and overall
+- Shared persistence via the API at /api/state
+- Installable Progressive Web App (PWA)
+- Azure App Service deployment prepared
 
-## Projektstruktur
+## Project Structure
 
-- web/ — Frontend der Web-App (HTML, CSS, JS, PWA-Dateien)
-- app.py — Python-HTTP-Server mit API unter /api/state und /healthz
-- data.json — persistenter Shared-State im JSON-Format
-- legacy/print/ — alte "reines Rum-Tasting Print"-Funktion (getrennt vom Hauptprodukt)
-- docs/ — Projekt-, Entwicklungs- und Deployment-Dokumentation
-- startup.sh, web.config, azure.yaml — Azure-Deployment-Konfiguration
+- web/ - Web frontend (HTML, CSS, JS, PWA files)
+- app.py - Python HTTP server with API endpoints at /api/state and /healthz
+- data.json - Persistent shared state in JSON format
+- legacy/print/ - Legacy "pure rum tasting print" feature (separated from the main product)
+- docs/ - Project, development, and deployment documentation
+- startup.sh, web.config, azure.yaml - Azure deployment configuration
 
 ```text
 rum_tasting/
@@ -47,31 +47,31 @@ rum_tasting/
    └─ DEPLOYMENT_AZURE.md
 ```
 
-## Lokal starten
+## Run Locally
 
-1. Terminal im Projektordner öffnen
-2. Virtuelle Umgebung anlegen und aktivieren
+1. Open a terminal in the project folder.
+2. Create and activate a virtual environment.
 
    ```powershell
    py -m venv venv
    .\venv\Scripts\Activate.ps1
    ```
 
-3. App starten
+3. Start the app.
 
    ```powershell
    python app.py
    ```
 
-4. Browser öffnen: http://127.0.0.1:8000/
+4. Open in browser: http://127.0.0.1:8000/
 
 ## API
 
-- GET /api/state liefert den gemeinsamen Zustand
-- POST /api/state speichert Änderungen als JSON
-- GET /healthz liefert einen einfachen Health-Check ("status": "ok")
+- GET /api/state returns the shared state.
+- POST /api/state saves updates as JSON.
+- GET /healthz returns a basic health check ("status": "ok").
 
-Die Datenstruktur enthält mindestens:
+The data structure includes at least:
 
 - participants
 - ratings
@@ -79,17 +79,17 @@ Die Datenstruktur enthält mindestens:
 - activeCategory
 - activeItemId
 
-## Hinweise zur Entwicklung
+## Development Notes
 
-- Die Frontend-Logik sitzt in web/app.js.
-- Änderungen am Datenmodell sollten immer konsistent in Frontend und Backend gepflegt werden.
-- Der Server lauscht auf PORT, damit er auch auf Azure/App Service funktioniert.
+- Frontend logic is in web/app.js.
+- Any data model changes should stay consistent across frontend and backend.
+- The server listens on PORT so it works on Azure App Service.
 
-## Legacy-Drucktemplate
+## Legacy Print Template
 
-Das Projekt enthielt ursprünglich ein Druck-Template für eine statische Rum-Tasting-Übersicht. Diese Funktion bleibt erhalten, liegt aber getrennt unter `legacy/print/`.
+The project originally included a print template for a static rum tasting overview. This feature is still available and separated under legacy/print/.
 
-Build-Beispiel:
+Build example:
 
 ```powershell
 python legacy/print/build_rum_tasting.py
