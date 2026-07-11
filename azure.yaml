@@ -1,0 +1,6 @@
+name: rum-tasting
+services:
+  web:
+    project: .
+    language: python
+    host: appservice

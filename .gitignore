@@ -1,0 +1,17 @@
+# Python virtual environments
+venv/
+.venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Local build/deploy artifacts
+deploy.zip
+
+# Legacy print outputs
+legacy/print/rum_tasting_print.pdf
+
+# OS/editor artifacts
+.DS_Store
+Thumbs.db

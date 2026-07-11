@@ -1,0 +1,9 @@
+{
+  "name": "Rum Tasting & Zigarren",
+  "short_name": "RumTasting",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1c120d",
+  "theme_color": "#4b2e1b",
+  "icons": []
+}

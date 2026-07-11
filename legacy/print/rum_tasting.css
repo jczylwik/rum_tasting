@@ -1,0 +1,182 @@
+/* Druckfertiges Rum-Tasting-Layout */
+:root {
+  --text: #231b12;
+  --accent: #b98d35;
+  --muted: #40352d;
+  --border: #c4a86a;
+  --line: rgba(185, 141, 53, 0.7);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(180deg, #f3eadf 0%, #f8f1e6 100%);
+}
+
+body {
+  padding: 10px;
+}
+
+.page {
+  width: 210mm;
+  min-height: 292mm;
+  margin: 0 auto 14px;
+  padding: 16mm 16mm;
+  background: #ffffff;
+  border: 1.5px solid var(--border);
+  box-shadow: 0 0 0 4px rgba(199, 170, 112, 0.16);
+  position: relative;
+  page-break-after: always;
+}
+
+.page:last-child {
+  page-break-after: auto;
+}
+
+.page::before,
+.page::after {
+  content: "";
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--accent);
+}
+
+.page::before {
+  top: 16px;
+  left: 16px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.page::after {
+  right: 16px;
+  bottom: 16px;
+  border-left: none;
+  border-top: none;
+}
+
+.paper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.content {
+  max-width: 176mm;
+  margin: 0 auto;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.75rem;
+  line-height: 1.02;
+  text-align: center;
+  letter-spacing: 0.08em;
+  font-style: italic;
+  color: var(--text);
+}
+
+h2 {
+  margin: 0.3em 0 1em;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  text-align: center;
+  color: var(--muted);
+}
+
+h3 {
+  margin: 1.3em 0 0.12em;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text);
+  position: relative;
+}
+
+h3::after {
+  content: "";
+  display: block;
+  width: 3.8rem;
+  height: 1px;
+  margin-top: 0.45em;
+  background: var(--line);
+}
+
+p {
+  margin: 0.18em 0 0.65em;
+}
+
+strong {
+  font-weight: 700;
+}
+
+em {
+  font-style: italic;
+}
+
+hr {
+  border: none;
+  height: 1px;
+  margin: 0.95em 0;
+  background: linear-gradient(to right, transparent, var(--line), transparent);
+}
+
+blockquote {
+  margin: 0.75em 0 1em;
+  padding: 0 1.1em;
+  font-size: 0.95rem;
+  font-style: italic;
+  text-align: center;
+  color: #453928;
+}
+
+ul {
+  margin: 0.35em 0 0.75em 1.1em;
+  padding: 0;
+}
+
+li {
+  margin: 0.18em 0;
+}
+
+li::marker {
+  color: var(--accent);
+  font-size: 1.1em;
+}
+
+p strong {
+  font-variant: small-caps;
+}
+
+h1 + h2 {
+  margin-top: 0.1em;
+}
+
+h3 + p {
+  margin-top: 0.25em;
+}
+
+@media print {
+  body {
+    background: #ffffff;
+    padding: 0;
+  }
+  .page {
+    box-shadow: none;
+    border-color: var(--border);
+  }
+  .page::before,
+  .page::after {
+    border-color: var(--accent);
+  }
+}

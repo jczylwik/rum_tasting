@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#4b2e1b" />
+    <meta name="description" content="Mobile Rum- und Zigarren-Tasting-App mit Teilnehmern und Bewertungen" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Rum Tasting & Zigarren</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Private Tasting-Erfahrung</p>
+          <h1>Rum & Zigarren im Überblick</h1>
+          <p class="hero-copy">
+            Eine einfache, mobile Website für Infos, Teilnehmer und schnelle Bewertungen
+            von Rums und Zigarren – ideal für kleine Abende oder Events.
+          </p>
+        </div>
+      </header>
+
+      <section class="card" aria-labelledby="participant-title">
+        <div class="section-heading">
+          <h2 id="participant-title">Teilnehmer</h2>
+          <p>Bitte einmal den Namen eingeben und direkt loslegen.</p>
+        </div>
+
+        <form id="participant-form" class="inline-form">
+          <label class="sr-only" for="participant-name">Name</label>
+          <input id="participant-name" name="participant-name" type="text" placeholder="Dein Name" maxlength="24" required />
+          <button type="submit">Teilnehmen</button>
+        </form>
+
+        <div id="participant-list" class="chip-list" aria-live="polite"></div>
+      </section>
+
+      <section class="card" aria-labelledby="info-rating-title">
+        <div class="section-heading">
+          <h2 id="info-rating-title">Info &amp; Bewertung</h2>
+          <p>Die wichtigsten Infos zu jedem Rum und jeder Zigarre direkt bei der Bewertung.</p>
+        </div>
+
+        <div id="item-explorer" class="item-explorer"></div>
+        <div id="stats-panel" class="stats-panel"></div>
+
+        <div id="active-participant" class="active-participant"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
