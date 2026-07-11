@@ -1,13 +1,16 @@
 # Rum Tasting & Cigars
 
-This is a simple, mobile-friendly tasting app for rum and cigars. It supports participant input, quick star ratings, lightweight statistics, and shared state through a small Python backend layer.
+This is a mobile-friendly live tasting app for rum and cigars. It supports participant onboarding, real-time shared ratings/comments across devices, and lightweight analytics with an optional advanced statistics panel.
 
 ## Features
 
 - Add and select participants
 - Rum and cigar catalog with item details
 - 1 to 5 star ratings
+- Live comments with heart reactions per item
 - Average score and histogram per item and overall
+- Filter-aware analytics (overall, all rum, all cigars, or single item)
+- Optional advanced analytics panel (toggle on/off): standard deviation, variance, median, 95% CI + nerd visualization
 - Shared persistence via the API at /api/state
 - Live updates across multiple devices (server-sent events with polling fallback)
 - Installable Progressive Web App (PWA)
@@ -80,6 +83,8 @@ The data structure includes at least:
 - activeParticipantId
 - activeCategory
 - activeItemId
+- ratingEvents
+- comments
 
 ## Development Notes
 
@@ -88,6 +93,20 @@ The data structure includes at least:
 - The server listens on PORT so it works on Azure App Service.
 - For small groups and a single app instance, file-based storage with SSE is sufficient.
 - A dedicated database becomes useful when you need stronger concurrency guarantees, history/audit data, or horizontal scaling across multiple app instances.
+
+## Azure Packaging Note (Important)
+
+When deploying ZIPs from Windows to Linux App Service, avoid Windows-style ZIP path separators from `Compress-Archive` (`web\\...`).
+
+Use `tar` to create the ZIP, then deploy:
+
+```powershell
+tar -a -c -f deploy-linux.zip app.py requirements.txt startup.sh web.config web docs README.md azure.yaml
+Copy-Item -Path deploy-linux.zip -Destination deploy.zip -Force
+az webapp deploy --resource-group <RG> --name <APP_NAME> --src-path .\deploy.zip --type zip --restart true
+```
+
+This ensures Linux-friendly `/` paths inside the archive and prevents static-file 404 issues.
 
 ## Legacy Print Template
 

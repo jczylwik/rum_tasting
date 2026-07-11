@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'rum-tasting-v1';
 const PARTICIPANT_SELECTED_KEY = 'rum-tasting-participant-selected';
+const ADVANCED_STATS_VISIBLE_KEY = 'rum-tasting-advanced-stats-visible';
 const API_URL = '/api/state';
 const EVENTS_URL = '/api/events';
 const FALLBACK_POLL_INTERVAL_MS = 2500;
@@ -11,7 +12,12 @@ const catalog = {
       name: 'Ron Abuelo 7 Años',
       description: 'Sanft, weich und sehr zugänglich.',
       details: {
-        Stil: 'Leichter Column Still',
+        Herkunft: 'Panama',
+        Produzent: 'Varela Hermanos',
+        Rohstoff: 'Melasse',
+        Destillation: 'Column Still',
+        Alter: '7 Jahre',
+        Alkohol: '40% vol',
         Aromen: 'Karamell · Vanille · leichte Süße',
         Charakter: 'Mild · rund · sehr zugänglich',
         Pairing: 'Ungesalzene Nüsse · Brot · Gegrillte Ananas'
@@ -22,7 +28,12 @@ const catalog = {
       name: 'Plantation Barbados 5 Years',
       description: 'Fruchtig, tropisch und leicht.',
       details: {
-        Stil: 'Fruchtig · weich · tropisch',
+        Herkunft: 'Barbados',
+        Produzent: 'Planteray (Maison Ferrand)',
+        Rohstoff: 'Melasse',
+        Destillation: 'Blend aus Pot & Column Still',
+        Alter: '5 Jahre',
+        Alkohol: '40% vol',
         Aromen: 'Banane · Kokos · Vanille',
         Charakter: 'Ausgewogen · ideal für Einsteiger',
         Pairing: 'Gegrillte Ananas · Geröstete Kokoschips'
@@ -33,7 +44,11 @@ const catalog = {
       name: 'Clément VSOP',
       description: 'Elegant, trocken und charaktervoll.',
       details: {
-        Stil: 'Rhum Agricole (Zuckerrohrsaft)',
+        Herkunft: 'Martinique (Frankreich)',
+        Kategorie: 'Rhum Agricole (AOC Martinique)',
+        Rohstoff: 'Frischer Zuckerrohrsaft',
+        Alter: 'mind. 4 Jahre',
+        Alkohol: '40% vol',
         Aromen: 'Grasig · frisch · Holz · Kräuter',
         Charakter: 'Trocken · elegant · französischer Stil',
         Pairing: 'Dunkle Schokolade · Kokoschips'
@@ -44,7 +59,12 @@ const catalog = {
       name: 'Appleton Estate 12 Years',
       description: 'Komplex, warm und würzig.',
       details: {
-        Stil: 'Eleganter Jamaica-Rum',
+        Herkunft: 'Jamaika',
+        Produzent: 'Appleton Estate (J. Wray & Nephew)',
+        Rohstoff: 'Melasse',
+        Destillation: 'Blend aus Pot & Column Still',
+        Alter: 'mind. 12 Jahre',
+        Alkohol: '43% vol',
         Aromen: 'Orange · Kakao · Gewürze · Eiche',
         Charakter: 'Komplex · warm · edel',
         Pairing: 'Dunkle Schokolade · Kräftigere Zigarren'
@@ -112,6 +132,7 @@ let pollTimer = null;
 let loadingRemoteState = false;
 let isParticipantPanelOpen = !state.activeParticipantId;
 let statsFilterItemId = 'all';
+let showAdvancedStats = localStorage.getItem(ADVANCED_STATS_VISIBLE_KEY) !== '0';
 let swipeStartX = null;
 let swipeStartY = null;
 let swipeStartTime = 0;
@@ -497,6 +518,51 @@ function getOverallAverage() {
   return values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1) : '–';
 }
 
+function getAllRatings() {
+  const allItems = Object.values(catalog).flat();
+  return state.participants.flatMap((participant) => {
+    return allItems
+      .map((item) => state.ratings[participant.id]?.[item.id])
+      .filter((rating) => typeof rating === 'number');
+  });
+}
+
+function getMean(values) {
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getVariance(values) {
+  if (values.length < 2) return null;
+  const mean = getMean(values);
+  const squaredDiffs = values.map((value) => (value - mean) ** 2);
+  return squaredDiffs.reduce((sum, value) => sum + value, 0) / (values.length - 1);
+}
+
+function getStandardDeviation(values) {
+  const variance = getVariance(values);
+  return variance === null ? null : Math.sqrt(variance);
+}
+
+function getMedian(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
+}
+
+function getConfidenceInterval95(values) {
+  if (values.length < 2) return null;
+  const mean = getMean(values);
+  const sd = getStandardDeviation(values);
+  if (sd === null) return null;
+  const margin = 1.96 * (sd / Math.sqrt(values.length));
+  return { min: mean - margin, max: mean + margin };
+}
+
 function getParticipantAverage(participantId) {
   const values = Object.values(state.ratings[participantId] || {}).filter((rating) => typeof rating === 'number');
   if (!values.length) return null;
@@ -569,6 +635,16 @@ function setStatsFilterItem(itemId) {
   renderStats();
 }
 
+function setAdvancedStatsVisibility(isVisible) {
+  showAdvancedStats = isVisible;
+  localStorage.setItem(ADVANCED_STATS_VISIBLE_KEY, isVisible ? '1' : '0');
+  renderStats();
+}
+
+function toggleAdvancedStatsVisibility() {
+  setAdvancedStatsVisibility(!showAdvancedStats);
+}
+
 function getFilteredItemIds() {
   if (statsFilterItemId === FILTER_ALL) {
     return Object.values(catalog).flat().map((item) => item.id);
@@ -620,9 +696,16 @@ function renderParticipantPanelVisibility() {
 }
 
 function renderExperienceVisibility() {
-  const section = document.getElementById('experience-section');
-  if (!section) return;
-  section.hidden = !state.activeParticipantId;
+  const experienceSection = document.getElementById('experience-section');
+  const statsSection = document.getElementById('stats-section');
+  const showExperience = Boolean(state.activeParticipantId);
+
+  if (experienceSection) {
+    experienceSection.hidden = !showExperience;
+  }
+  if (statsSection) {
+    statsSection.hidden = !showExperience;
+  }
 }
 
 function renderParticipants() {
@@ -812,6 +895,21 @@ function renderStats() {
       : statsFilterItemId === FILTER_ALL_CIGAR
         ? 'Durchschnitt aller Zigarren'
         : `Durchschnitt fuer ${selectedFilterItem?.name || 'Auswahl'}`;
+  const filteredRatings = state.participants.flatMap((participant) => {
+    return filteredItemIds
+      .map((itemId) => state.ratings[participant.id]?.[itemId])
+      .filter((rating) => typeof rating === 'number');
+  });
+  const standardDeviation = getStandardDeviation(filteredRatings);
+  const variance = getVariance(filteredRatings);
+  const median = getMedian(filteredRatings);
+  const confidenceInterval95 = getConfidenceInterval95(filteredRatings);
+  const sigmaPercent = standardDeviation === null ? 0 : Math.max(0, Math.min(100, (standardDeviation / 2) * 100));
+  const medianPercent = median === null ? 0 : Math.max(0, Math.min(100, ((median - 1) / 4) * 100));
+  const ciMin = confidenceInterval95 === null ? null : Math.max(1, confidenceInterval95.min);
+  const ciMax = confidenceInterval95 === null ? null : Math.min(5, confidenceInterval95.max);
+  const ciStartPercent = ciMin === null ? 0 : Math.max(0, Math.min(100, ((ciMin - 1) / 4) * 100));
+  const ciWidthPercent = ciMin === null || ciMax === null ? 0 : Math.max(0, Math.min(100, ((ciMax - ciMin) / 4) * 100));
 
   const timelineEntries = [...(state.ratingEvents || [])]
     .slice(-8)
@@ -875,7 +973,56 @@ function renderStats() {
           ${catalog.cigar.map((item) => `<option value="${item.id}" ${statsFilterItemId === item.id ? 'selected' : ''}>${item.name}</option>`).join('')}
         </optgroup>
       </select>
+      <button type="button" class="advanced-toggle-btn" data-action="toggle-advanced-stats" aria-expanded="${showAdvancedStats ? 'true' : 'false'}">
+        ${showAdvancedStats ? 'Advanced ausblenden' : 'Advanced anzeigen'}
+      </button>
     </div>
+
+    ${showAdvancedStats ? `
+      <div class="stats-grid nerd-stats-grid">
+        <div class="stat-box">
+          <span class="stat-label">Standardabweichung (Filter)</span>
+          <strong>${standardDeviation === null ? '–' : standardDeviation.toFixed(2)}</strong>
+          <small>${standardDeviation === null ? 'Mindestens 2 Bewertungen noetig.' : 'Hoeher = uneinigeres Feld'}</small>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Median (Filter)</span>
+          <strong>${median === null ? '–' : median.toFixed(1)}</strong>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Varianz (Filter)</span>
+          <strong>${variance === null ? '–' : variance.toFixed(2)}</strong>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">95%-Konfidenzintervall (Filter-Mittelwert)</span>
+          <strong>${confidenceInterval95 === null ? '–' : `${confidenceInterval95.min.toFixed(2)} bis ${confidenceInterval95.max.toFixed(2)}`}</strong>
+        </div>
+      </div>
+
+      <div class="nerd-lab-box" aria-label="Wissenschaftliche Analyse zur Filterauswahl">
+        <h4>Nerd-Labor</h4>
+        <p>Visualisiert fuer die aktuelle Filterauswahl mit n=${filteredRatings.length} Einzelwerten.</p>
+
+        <div class="nerd-meter-row">
+          <span>Sigma-Intensitaet</span>
+          <div class="nerd-meter-track" aria-hidden="true">
+            <div class="nerd-meter-fill" style="width:${sigmaPercent}%"></div>
+          </div>
+          <strong>${standardDeviation === null ? '–' : `${sigmaPercent.toFixed(0)}%`}</strong>
+        </div>
+
+        <div class="nerd-meter-row">
+          <span>Median-Position (1-5)</span>
+          <div class="nerd-scale-track" aria-hidden="true">
+            <div class="nerd-scale-ci" style="left:${ciStartPercent}%; width:${ciWidthPercent}%"></div>
+            <div class="nerd-scale-dot" style="left:${medianPercent}%"></div>
+          </div>
+          <strong>${median === null ? '–' : median.toFixed(1)}</strong>
+        </div>
+
+        <small class="nerd-lab-note">Band = 95%-Konfidenzintervall, Punkt = Median, Skala von 1 bis 5.</small>
+      </div>
+    ` : ''}
 
     <div class="histogram-summary-grid">
       <div class="histogram" aria-label="${histogramLabel}">
@@ -969,6 +1116,11 @@ function handleAppClick(event) {
 
   if (action === 'toggle-participants') {
     toggleParticipantPanel();
+    return;
+  }
+
+  if (action === 'toggle-advanced-stats') {
+    toggleAdvancedStatsVisibility();
     return;
   }
 

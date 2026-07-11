@@ -16,7 +16,20 @@ The app is prepared to run on Azure App Service as a Python web app.
 1. Create or reuse an App Service.
 2. Set the Python runtime to 3.10.
 3. Set startup command to `bash startup.sh` (or directly `python app.py`).
-4. Deploy the project as ZIP or publish through Azure CLI.
+4. Build and deploy a Linux-compatible ZIP package.
+
+### Build ZIP on Windows for Linux App Service (critical)
+
+Do not rely on `Compress-Archive` for the deployment artifact in this project. It can produce archive paths like `web\\index.html`, which may lead to static-file 404s on Linux App Service.
+
+Use:
+
+```powershell
+tar -a -c -f deploy-linux.zip app.py requirements.txt startup.sh web.config web docs README.md azure.yaml
+Copy-Item -Path deploy-linux.zip -Destination deploy.zip -Force
+```
+
+Then deploy `deploy.zip`.
 
 ### Azure CLI (recommended)
 
@@ -25,6 +38,7 @@ az webapp config set --resource-group <RG> --name <APP_NAME> --startup-file "bas
 az webapp log config --resource-group <RG> --name <APP_NAME> --application-logging filesystem --level information
 az webapp restart --resource-group <RG> --name <APP_NAME>
 az webapp log tail --resource-group <RG> --name <APP_NAME>
+az webapp deploy --resource-group <RG> --name <APP_NAME> --src-path .\deploy.zip --type zip --restart true
 ```
 
 Enable Health Check in App Service:
@@ -46,6 +60,7 @@ az webapp config set --resource-group <RG> --name <APP_NAME> --startup-file "pyt
 - Application Error: usually a Python startup issue or an incorrect startup command
 - 403/Stopped: the web app is not started or the plan has a problem
 - QuotaExceeded: the App Service plan is out of capacity or blocked by plan limits
+- API works but `/`, `/styles.css`, `/app.js` return 404: likely invalid ZIP structure (Windows separators in archive paths)
 
 ## Practical Notes
 
@@ -54,6 +69,7 @@ az webapp config set --resource-group <RG> --name <APP_NAME> --startup-file "pyt
 - The server binds to `0.0.0.0` and reads `PORT` from the Azure environment.
 - `GET /healthz` is available for availability checks.
 - The app does not use a database; persistent JSON storage provides shared state.
+- If clients show stale UI after deployment, bump script version in `web/index.html` and reload once.
 
 ## Verified Target Configuration (as of 2026-07-11)
 

@@ -1,6 +1,8 @@
 # Rum Tasting Guide
 ## Auswahl deiner vier Rums
 
+Stand: 11.07.2026 (Datenabgleich Herkunft/ABV/Alter)
+
 ---
 
 ### **Ron Abuelo 7 Años – Panama (40%)**
@@ -13,7 +15,7 @@
 ---
 
 ### **Plantation Barbados 5 Years – Barbados (40%)**
-**Stil:** Fruchtig · weich · tropisch  
+**Stil:** Melasse-Rum · Blend aus Pot & Column Still  
 **Aromen:** Banane · Kokos · Vanille  
 **Charakter:** Ausgewogen · ideal für Einsteiger  
 **Zitat:** „Typischer Barbados‑Rum – fruchtig, weich, sehr angenehm.“  
@@ -22,7 +24,7 @@
 ---
 
 ### **Clément VSOP – Martinique (Agricole) (40%)**
-**Stil:** Rhum Agricole (Zuckerrohrsaft)  
+**Stil:** Rhum Agricole (AOC Martinique, Zuckerrohrsaft)  
 **Aromen:** Grasig · frisch · Holz · Kräuter  
 **Charakter:** Trocken · elegant · französischer Stil  
 **Zitat:** „Agricole – frisch, grasig, weniger süß.“  
@@ -31,7 +33,7 @@
 ---
 
 ### **Appleton Estate 12 Years – Jamaica (43%)**
-**Stil:** Eleganter Jamaica‑Rum  
+**Stil:** Blend aus Pot & Column Still (mind. 12 Jahre)  
 **Aromen:** Orange · Kakao · Gewürze · Eiche  
 **Charakter:** Komplex · warm · edel  
 **Zitat:** „Jamaica ohne Funk‑Überfall – würzig, elegant.“  
