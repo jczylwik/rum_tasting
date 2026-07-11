@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'rum-tasting-v1';
 const API_URL = '/api/state';
 const EVENTS_URL = '/api/events';
-const FALLBACK_POLL_INTERVAL_MS = 5000;
+const FALLBACK_POLL_INTERVAL_MS = 2500;
 
 const catalog = {
   rum: [
@@ -202,14 +202,11 @@ function stopFallbackPolling() {
 
 function startRealtimeUpdates() {
   if (!('EventSource' in window)) {
-    startFallbackPolling();
     return;
   }
 
   eventSource = new EventSource(EVENTS_URL);
-  eventSource.onopen = () => {
-    stopFallbackPolling();
-  };
+  eventSource.onopen = () => {};
   eventSource.onmessage = () => {
     loadRemoteState();
   };
@@ -218,8 +215,15 @@ function startRealtimeUpdates() {
       eventSource.close();
       eventSource = null;
     }
-    startFallbackPolling();
   };
+}
+
+function setupVisibilityRefresh() {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      loadRemoteState();
+    }
+  });
 }
 
 function createParticipantId(name) {
@@ -551,7 +555,9 @@ document.addEventListener('click', handleAppClick);
 
 render();
 loadRemoteState();
+startFallbackPolling();
 startRealtimeUpdates();
+setupVisibilityRefresh();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
