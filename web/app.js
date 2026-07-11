@@ -990,6 +990,10 @@ function renderStats() {
   const ciMax = confidenceInterval95 === null ? null : Math.min(5, confidenceInterval95.max);
   const ciStartPercent = ciMin === null ? 0 : Math.max(0, Math.min(100, ((ciMin - 1) / 4) * 100));
   const ciWidthPercent = ciMin === null || ciMax === null ? 0 : Math.max(0, Math.min(100, ((ciMax - ciMin) / 4) * 100));
+  const variancePercent = variance === null ? 0 : Math.max(0, Math.min(100, (variance / 4) * 100));
+  const ciCenterPercent = ciMin === null || ciMax === null
+    ? 0
+    : Math.max(0, Math.min(100, ((((ciMin + ciMax) / 2) - 1) / 4) * 100));
 
   const timelineEntries = [...(state.ratingEvents || [])]
     .slice(-8)
@@ -1059,29 +1063,48 @@ function renderStats() {
     </div>
 
     ${showAdvancedStats ? `
-      <div class="stats-grid nerd-stats-grid">
-        <div class="stat-box">
-          <span class="stat-label">Standardabweichung (Filter)</span>
-          <strong>${standardDeviation === null ? '–' : standardDeviation.toFixed(2)}</strong>
-          <small>${standardDeviation === null ? 'Mindestens 2 Bewertungen noetig.' : 'Hoeher = uneinigeres Feld'}</small>
-        </div>
-        <div class="stat-box">
-          <span class="stat-label">Median (Filter)</span>
-          <strong>${median === null ? '–' : median.toFixed(1)}</strong>
-        </div>
-        <div class="stat-box">
-          <span class="stat-label">Varianz (Filter)</span>
-          <strong>${variance === null ? '–' : variance.toFixed(2)}</strong>
-        </div>
-        <div class="stat-box">
-          <span class="stat-label">95%-Konfidenzintervall (Filter-Mittelwert)</span>
-          <strong>${confidenceInterval95 === null ? '–' : `${confidenceInterval95.min.toFixed(2)} bis ${confidenceInterval95.max.toFixed(2)}`}</strong>
-        </div>
-      </div>
-
       <div class="nerd-lab-box" aria-label="Wissenschaftliche Analyse zur Filterauswahl">
         <h4>Nerd-Labor</h4>
         <p>Visualisiert fuer die aktuelle Filterauswahl mit n=${filteredRatings.length} Einzelwerten.</p>
+
+        <div class="nerd-kpi-grid">
+          <div class="nerd-kpi-card">
+            <span class="stat-label">Standardabweichung (Filter)</span>
+            <strong>${standardDeviation === null ? '–' : standardDeviation.toFixed(2)}</strong>
+            <div class="nerd-meter-track" aria-hidden="true">
+              <div class="nerd-meter-fill" style="width:${sigmaPercent}%"></div>
+            </div>
+            <small>${standardDeviation === null ? 'Mindestens 2 Bewertungen noetig.' : 'Hoeher = uneinigeres Feld'}</small>
+          </div>
+
+          <div class="nerd-kpi-card">
+            <span class="stat-label">Median (Filter)</span>
+            <strong>${median === null ? '–' : median.toFixed(1)}</strong>
+            <div class="nerd-scale-track" aria-hidden="true">
+              <div class="nerd-scale-dot" style="left:${medianPercent}%"></div>
+            </div>
+            <small>${median === null ? 'Kein Median verfuegbar.' : 'Position auf der 1-5 Skala.'}</small>
+          </div>
+
+          <div class="nerd-kpi-card">
+            <span class="stat-label">Varianz (Filter)</span>
+            <strong>${variance === null ? '–' : variance.toFixed(2)}</strong>
+            <div class="nerd-meter-track" aria-hidden="true">
+              <div class="nerd-meter-fill" style="width:${variancePercent}%"></div>
+            </div>
+            <small>${variance === null ? 'Mindestens 2 Bewertungen noetig.' : 'Streuung im Quadrat.'}</small>
+          </div>
+
+          <div class="nerd-kpi-card">
+            <span class="stat-label">95%-Konfidenzintervall (Filter-Mittelwert)</span>
+            <strong>${confidenceInterval95 === null ? '–' : `${confidenceInterval95.min.toFixed(2)} bis ${confidenceInterval95.max.toFixed(2)}`}</strong>
+            <div class="nerd-scale-track" aria-hidden="true">
+              <div class="nerd-scale-ci" style="left:${ciStartPercent}%; width:${ciWidthPercent}%"></div>
+              <div class="nerd-scale-dot" style="left:${ciCenterPercent}%"></div>
+            </div>
+            <small>${confidenceInterval95 === null ? 'Nicht genug Daten fuer Intervall.' : 'Band zeigt die Unsicherheit des Mittelwerts.'}</small>
+          </div>
+        </div>
 
         <div class="nerd-meter-row">
           <span>Sigma-Intensitaet</span>
