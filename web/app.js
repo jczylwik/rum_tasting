@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'rum-tasting-v1';
+const PARTICIPANT_SELECTED_KEY = 'rum-tasting-participant-selected';
 const API_URL = '/api/state';
 const EVENTS_URL = '/api/events';
 const FALLBACK_POLL_INTERVAL_MS = 2500;
@@ -117,6 +118,9 @@ let swipeStartTime = 0;
 const SWIPE_MIN_DISTANCE_PX = 48;
 const SWIPE_MAX_DURATION_MS = 650;
 const SWIPE_MAX_VERTICAL_DRIFT_PX = 42;
+const FILTER_ALL = 'all';
+const FILTER_ALL_RUM = 'all-rum';
+const FILTER_ALL_CIGAR = 'all-cigar';
 
 
 function buildStateSignature(inputState) {
@@ -127,6 +131,7 @@ function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     const parsed = saved ? JSON.parse(saved) : defaultState;
+    const hasLocalSelection = localStorage.getItem(PARTICIPANT_SELECTED_KEY) === '1';
     const loaded = {
       ...defaultState,
       ...parsed,
@@ -134,11 +139,28 @@ function loadState() {
       ratings: parsed.ratings || {},
       ratingEvents: parsed.ratingEvents || []
     };
+
+    if (!hasLocalSelection) {
+      loaded.activeParticipantId = null;
+    }
+
     stateSignature = buildStateSignature(loaded);
     return loaded;
   } catch {
     stateSignature = buildStateSignature(defaultState);
     return defaultState;
+  }
+}
+
+function hasLocalParticipantSelection() {
+  return localStorage.getItem(PARTICIPANT_SELECTED_KEY) === '1';
+}
+
+function setLocalParticipantSelection(selected) {
+  if (selected) {
+    localStorage.setItem(PARTICIPANT_SELECTED_KEY, '1');
+  } else {
+    localStorage.removeItem(PARTICIPANT_SELECTED_KEY);
   }
 }
 
@@ -157,6 +179,10 @@ function applyRemoteState(remoteState) {
   };
 
   if (merged.activeParticipantId && !merged.participants.some((participant) => participant.id === merged.activeParticipantId)) {
+    merged.activeParticipantId = null;
+  }
+
+  if (!hasLocalParticipantSelection()) {
     merged.activeParticipantId = null;
   }
 
@@ -259,6 +285,7 @@ function addParticipant(name) {
   const existing = state.participants.find((participant) => participant.name.toLowerCase() === cleanName.toLowerCase());
   if (existing) {
     state.activeParticipantId = existing.id;
+    setLocalParticipantSelection(true);
     isParticipantPanelOpen = false;
     persistLocalState();
     render();
@@ -269,6 +296,7 @@ function addParticipant(name) {
   const participant = { id: createParticipantId(cleanName), name: cleanName };
   state.participants.push(participant);
   state.activeParticipantId = participant.id;
+  setLocalParticipantSelection(true);
   state.ratings[participant.id] = {};
   isParticipantPanelOpen = false;
   persistLocalState();
@@ -278,6 +306,7 @@ function addParticipant(name) {
 
 function setActiveParticipant(id) {
   state.activeParticipantId = id;
+  setLocalParticipantSelection(true);
   isParticipantPanelOpen = false;
   persistLocalState();
   render();
@@ -290,6 +319,7 @@ function removeParticipant(id) {
     state.activeParticipantId = state.participants[0]?.id || null;
   }
   if (!state.activeParticipantId) {
+    setLocalParticipantSelection(false);
     isParticipantPanelOpen = true;
   }
   persistLocalState();
@@ -480,11 +510,51 @@ function setupSwipeNavigation() {
 
 function setStatsFilterItem(itemId) {
   const allItems = Object.values(catalog).flat();
-  if (itemId !== 'all' && !allItems.some((item) => item.id === itemId)) {
+  const isCategoryFilter = itemId === FILTER_ALL_RUM || itemId === FILTER_ALL_CIGAR;
+  if (itemId !== FILTER_ALL && !isCategoryFilter && !allItems.some((item) => item.id === itemId)) {
     return;
   }
   statsFilterItemId = itemId;
   renderStats();
+}
+
+function getFilteredItemIds() {
+  if (statsFilterItemId === FILTER_ALL) {
+    return Object.values(catalog).flat().map((item) => item.id);
+  }
+
+  if (statsFilterItemId === FILTER_ALL_RUM) {
+    return catalog.rum.map((item) => item.id);
+  }
+
+  if (statsFilterItemId === FILTER_ALL_CIGAR) {
+    return catalog.cigar.map((item) => item.id);
+  }
+
+  return [statsFilterItemId];
+}
+
+function getFilteredHistogram(itemIds) {
+  const histogram = [0, 0, 0, 0, 0];
+  state.participants.forEach((participant) => {
+    itemIds.forEach((itemId) => {
+      const rating = state.ratings[participant.id]?.[itemId];
+      if (typeof rating === 'number' && rating >= 1 && rating <= 5) {
+        histogram[rating - 1] += 1;
+      }
+    });
+  });
+  return histogram;
+}
+
+function getFilteredAverage(itemIds) {
+  const values = state.participants.flatMap((participant) => {
+    return itemIds
+      .map((itemId) => state.ratings[participant.id]?.[itemId])
+      .filter((rating) => typeof rating === 'number');
+  });
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function renderParticipantPanelVisibility() {
@@ -617,8 +687,6 @@ function renderItemExplorer() {
 function renderStats() {
   const overallAverage = getOverallAverage();
   const overallAverageNumber = overallAverage === '–' ? null : Number(overallAverage);
-  const rumAverage = getAverageForCategory('rum');
-  const cigarAverage = getAverageForCategory('cigar');
   const mostRated = Object.values(catalog).flat().map((item) => ({
     item,
     votes: getVotesForItem(item.id).length
@@ -642,21 +710,28 @@ function renderStats() {
 
   const allItems = Object.values(catalog).flat();
   const selectedFilterItem = allItems.find((item) => item.id === statsFilterItemId) || null;
-  if (statsFilterItemId !== 'all' && !selectedFilterItem) {
-    statsFilterItemId = 'all';
+  if (![FILTER_ALL, FILTER_ALL_RUM, FILTER_ALL_CIGAR].includes(statsFilterItemId) && !selectedFilterItem) {
+    statsFilterItemId = FILTER_ALL;
   }
 
-  const histogramValues = statsFilterItemId === 'all' ? getOverallHistogram() : getHistogramForItem(statsFilterItemId);
+  const filteredItemIds = getFilteredItemIds();
+  const histogramValues = getFilteredHistogram(filteredItemIds);
   const maxHistogramValue = Math.max(...histogramValues, 1);
-  const histogramLabel = statsFilterItemId === 'all'
+  const histogramLabel = statsFilterItemId === FILTER_ALL
     ? 'Histogramm der Gesamtbewertungen'
-    : `Histogramm fuer ${selectedFilterItem?.name || 'Auswahl'}`;
-  const filteredAverageNumber = statsFilterItemId === 'all'
-    ? overallAverageNumber
-    : getAverageNumberForItem(statsFilterItemId);
-  const filteredAverageLabel = statsFilterItemId === 'all'
+    : statsFilterItemId === FILTER_ALL_RUM
+      ? 'Histogramm aller Rums'
+      : statsFilterItemId === FILTER_ALL_CIGAR
+        ? 'Histogramm aller Zigarren'
+        : `Histogramm fuer ${selectedFilterItem?.name || 'Auswahl'}`;
+  const filteredAverageNumber = getFilteredAverage(filteredItemIds);
+  const filteredAverageLabel = statsFilterItemId === FILTER_ALL
     ? 'Gesamtdurchschnitt'
-    : `Durchschnitt fuer ${selectedFilterItem?.name || 'Auswahl'}`;
+    : statsFilterItemId === FILTER_ALL_RUM
+      ? 'Durchschnitt aller Rums'
+      : statsFilterItemId === FILTER_ALL_CIGAR
+        ? 'Durchschnitt aller Zigarren'
+        : `Durchschnitt fuer ${selectedFilterItem?.name || 'Auswahl'}`;
 
   const timelineEntries = [...(state.ratingEvents || [])]
     .slice(-8)
@@ -673,9 +748,9 @@ function renderStats() {
       };
     });
 
-  const visibleTimelineEntries = statsFilterItemId === 'all'
+  const visibleTimelineEntries = statsFilterItemId === FILTER_ALL
     ? timelineEntries
-    : timelineEntries.filter((entry) => entry.itemId === statsFilterItemId);
+    : timelineEntries.filter((entry) => filteredItemIds.includes(entry.itemId));
 
   document.getElementById('stats-panel').innerHTML = `
     <div class="stats-grid">
@@ -691,14 +766,6 @@ function renderStats() {
       <div class="stat-box">
         <span class="stat-label">Beliebteste Auswahl</span>
         <strong>${mostRated?.item.name || 'Noch keine'}</strong>
-      </div>
-      <div class="stat-box">
-        <span class="stat-label">Rums / Zigarren</span>
-        <strong>${rumAverage === null ? '–' : rumAverage.toFixed(1)}/5 · ${cigarAverage === null ? '–' : cigarAverage.toFixed(1)}/5</strong>
-        <div class="dual-stars">
-          <div class="dual-star-row"><span>Rums</span>${renderAverageStars(rumAverage, 'Rum Durchschnitt')}</div>
-          <div class="dual-star-row"><span>Zigarren</span>${renderAverageStars(cigarAverage, 'Zigarren Durchschnitt')}</div>
-        </div>
       </div>
     </div>
 
@@ -718,7 +785,9 @@ function renderStats() {
     <div class="stats-filter-box">
       <label class="stats-filter-label" for="stats-item-filter">Filter</label>
       <select id="stats-item-filter" data-action="stats-filter" class="stats-filter-select">
-        <option value="all" ${statsFilterItemId === 'all' ? 'selected' : ''}>Alle Rums & Zigarren</option>
+        <option value="${FILTER_ALL}" ${statsFilterItemId === FILTER_ALL ? 'selected' : ''}>Alle Rums & Zigarren</option>
+        <option value="${FILTER_ALL_RUM}" ${statsFilterItemId === FILTER_ALL_RUM ? 'selected' : ''}>Alle Rums</option>
+        <option value="${FILTER_ALL_CIGAR}" ${statsFilterItemId === FILTER_ALL_CIGAR ? 'selected' : ''}>Alle Zigarren</option>
         <optgroup label="Rums">
           ${catalog.rum.map((item) => `<option value="${item.id}" ${statsFilterItemId === item.id ? 'selected' : ''}>${item.name}</option>`).join('')}
         </optgroup>
