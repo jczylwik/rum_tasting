@@ -99,7 +99,8 @@ const defaultState = {
   activeParticipantId: null,
   activeCategory: 'rum',
   activeItemId: null,
-  ratings: {}
+  ratings: {},
+  ratingEvents: []
 };
 
 let stateSignature = '';
@@ -107,6 +108,7 @@ let state = loadState();
 let eventSource = null;
 let pollTimer = null;
 let loadingRemoteState = false;
+let isParticipantPanelOpen = !state.activeParticipantId;
 
 
 function buildStateSignature(inputState) {
@@ -121,7 +123,8 @@ function loadState() {
       ...defaultState,
       ...parsed,
       participants: parsed.participants || [],
-      ratings: parsed.ratings || {}
+      ratings: parsed.ratings || {},
+      ratingEvents: parsed.ratingEvents || []
     };
     stateSignature = buildStateSignature(loaded);
     return loaded;
@@ -141,7 +144,8 @@ function applyRemoteState(remoteState) {
     ...defaultState,
     ...state,
     participants: remoteState.participants || state.participants || [],
-    ratings: remoteState.ratings || state.ratings || {}
+    ratings: remoteState.ratings || state.ratings || {},
+    ratingEvents: remoteState.ratingEvents || state.ratingEvents || []
   };
 
   if (!merged.participants.some((participant) => participant.id === merged.activeParticipantId)) {
@@ -247,6 +251,7 @@ function addParticipant(name) {
   const existing = state.participants.find((participant) => participant.name.toLowerCase() === cleanName.toLowerCase());
   if (existing) {
     state.activeParticipantId = existing.id;
+    isParticipantPanelOpen = false;
     persistLocalState();
     render();
     syncState({ participants: state.participants, ratings: state.ratings });
@@ -257,6 +262,7 @@ function addParticipant(name) {
   state.participants.push(participant);
   state.activeParticipantId = participant.id;
   state.ratings[participant.id] = {};
+  isParticipantPanelOpen = false;
   persistLocalState();
   render();
   syncState({ participants: state.participants, ratings: state.ratings });
@@ -264,6 +270,7 @@ function addParticipant(name) {
 
 function setActiveParticipant(id) {
   state.activeParticipantId = id;
+  isParticipantPanelOpen = false;
   persistLocalState();
   render();
 }
@@ -273,6 +280,9 @@ function removeParticipant(id) {
   delete state.ratings[id];
   if (state.activeParticipantId === id) {
     state.activeParticipantId = state.participants[0]?.id || null;
+  }
+  if (!state.activeParticipantId) {
+    isParticipantPanelOpen = true;
   }
   persistLocalState();
   render();
@@ -285,9 +295,16 @@ function setRating(itemKey, rating) {
     state.ratings[state.activeParticipantId] = {};
   }
   state.ratings[state.activeParticipantId][itemKey] = rating;
+  state.ratingEvents.push({
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    participantId: state.activeParticipantId,
+    itemId: itemKey,
+    rating,
+    timestamp: new Date().toISOString()
+  });
   persistLocalState();
   render();
-  syncState({ ratings: state.ratings });
+  syncState({ ratings: state.ratings, ratingEvents: state.ratingEvents });
 }
 
 function setActiveCategory(category) {
@@ -326,8 +343,34 @@ function getVotesForItem(itemId) {
 }
 
 function getAverageForItem(itemId) {
+  const value = getAverageNumberForItem(itemId);
+  return value === null ? '–' : value.toFixed(1);
+}
+
+function getAverageNumberForItem(itemId) {
   const values = getVotesForItem(itemId);
-  return values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1) : '–';
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getAverageForCategory(category) {
+  const items = catalog[category] || [];
+  const values = items.flatMap((item) => getVotesForItem(item.id));
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function renderAverageStars(value, label) {
+  if (value === null) {
+    return '<span class="avg-stars-empty">Noch keine Bewertungen</span>';
+  }
+
+  const stars = [1, 2, 3, 4, 5].map((index) => {
+    const fill = Math.max(0, Math.min(100, Math.round((value - (index - 1)) * 100)));
+    return `<span class="avg-star" style="--fill:${fill}%">★</span>`;
+  }).join('');
+
+  return `<span class="avg-stars" aria-label="${label}: ${value.toFixed(1)} von 5">${stars}</span>`;
 }
 
 function getHistogramForItem(itemId) {
@@ -365,6 +408,36 @@ function getOverallAverage() {
   return values.length ? (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1) : '–';
 }
 
+function getParticipantAverage(participantId) {
+  const values = Object.values(state.ratings[participantId] || {}).filter((rating) => typeof rating === 'number');
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function formatEventTime(timestamp) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Unbekannt';
+  return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function toggleParticipantPanel() {
+  if (!state.activeParticipantId) {
+    isParticipantPanelOpen = true;
+  } else {
+    isParticipantPanelOpen = !isParticipantPanelOpen;
+  }
+  render();
+}
+
+function renderParticipantPanelVisibility() {
+  const section = document.getElementById('participant-section');
+  const button = document.getElementById('active-participant');
+  const isOpen = !state.activeParticipantId || isParticipantPanelOpen;
+
+  section.classList.toggle('collapsed', !isOpen);
+  button.setAttribute('aria-expanded', String(isOpen));
+}
+
 function renderParticipants() {
   const container = document.getElementById('participant-list');
   container.innerHTML = '';
@@ -392,12 +465,14 @@ function renderActiveParticipant() {
   if (!state.activeParticipantId) {
     container.textContent = 'Aktiver Teilnehmer: noch keiner ausgewählt';
     summary.textContent = `${state.participants.length} Teilnehmer · ${getOverallAverage()}/5 gesamt`;
+    renderParticipantPanelVisibility();
     return;
   }
 
   const current = state.participants.find((participant) => participant.id === state.activeParticipantId);
   container.textContent = `Aktiver Teilnehmer: ${current?.name || 'Unbekannt'}`;
   summary.textContent = `${state.participants.length} Teilnehmer · ${getOverallAverage()}/5 gesamt`;
+  renderParticipantPanelVisibility();
 }
 
 function renderItemExplorer() {
@@ -410,6 +485,7 @@ function renderItemExplorer() {
   const items = catalog[state.activeCategory];
   const currentIndex = items.findIndex((item) => item.id === currentItem.id) + 1;
   const currentRating = state.activeParticipantId ? state.ratings[state.activeParticipantId]?.[currentItem.id] : null;
+  const itemAverageNumber = getAverageNumberForItem(currentItem.id);
   const itemAverage = getAverageForItem(currentItem.id);
   const itemHistogram = getHistogramForItem(currentItem.id);
   const maxValue = Math.max(...itemHistogram, 1);
@@ -454,6 +530,7 @@ function renderItemExplorer() {
         <div class="stat-box">
           <span class="stat-label">Durchschnitt für ${currentItem.name}</span>
           <strong>${itemAverage}/5</strong>
+          ${renderAverageStars(itemAverageNumber, `Durchschnitt für ${currentItem.name}`)}
         </div>
         <div class="histogram" aria-label="Histogramm der Bewertungen für ${currentItem.name}">
           ${itemHistogram.map((count, index) => `
@@ -473,6 +550,9 @@ function renderItemExplorer() {
 
 function renderStats() {
   const overallAverage = getOverallAverage();
+  const overallAverageNumber = overallAverage === '–' ? null : Number(overallAverage);
+  const rumAverage = getAverageForCategory('rum');
+  const cigarAverage = getAverageForCategory('cigar');
   const overallHistogram = getOverallHistogram();
   const maxValue = Math.max(...overallHistogram, 1);
   const mostRated = Object.values(catalog).flat().map((item) => ({
@@ -480,11 +560,42 @@ function renderStats() {
     votes: getVotesForItem(item.id).length
   })).sort((left, right) => right.votes - left.votes)[0];
 
+  const participantScores = state.participants.map((participant) => ({
+    participant,
+    average: getParticipantAverage(participant.id)
+  })).filter((entry) => entry.average !== null);
+  const strictest = participantScores.length
+    ? participantScores.reduce((best, current) => (current.average < best.average ? current : best), participantScores[0])
+    : null;
+  const kindest = participantScores.length
+    ? participantScores.reduce((best, current) => (current.average > best.average ? current : best), participantScores[0])
+    : null;
+
+  const itemById = Object.values(catalog).flat().reduce((acc, item) => {
+    acc[item.id] = item;
+    return acc;
+  }, {});
+
+  const timelineEntries = [...(state.ratingEvents || [])]
+    .slice(-8)
+    .reverse()
+    .map((event) => {
+      const participant = state.participants.find((entry) => entry.id === event.participantId);
+      const item = itemById[event.itemId];
+      return {
+        when: formatEventTime(event.timestamp),
+        participantName: participant?.name || 'Unbekannt',
+        itemName: item?.name || event.itemId,
+        rating: event.rating
+      };
+    });
+
   document.getElementById('stats-panel').innerHTML = `
     <div class="stats-grid">
       <div class="stat-box">
         <span class="stat-label">Gesamtdurchschnitt</span>
         <strong>${overallAverage}/5</strong>
+        ${renderAverageStars(overallAverageNumber, 'Gesamtdurchschnitt')}
       </div>
       <div class="stat-box">
         <span class="stat-label">Teilnehmer</span>
@@ -496,9 +607,41 @@ function renderStats() {
       </div>
       <div class="stat-box">
         <span class="stat-label">Rums / Zigarren</span>
-        <strong>${getAverageForItem(catalog.rum[0].id)}/5 · ${getAverageForItem(catalog.cigar[0].id)}/5</strong>
+        <strong>${rumAverage === null ? '–' : rumAverage.toFixed(1)}/5 · ${cigarAverage === null ? '–' : cigarAverage.toFixed(1)}/5</strong>
+        <div class="dual-stars">
+          <div class="dual-star-row"><span>Rums</span>${renderAverageStars(rumAverage, 'Rum Durchschnitt')}</div>
+          <div class="dual-star-row"><span>Zigarren</span>${renderAverageStars(cigarAverage, 'Zigarren Durchschnitt')}</div>
+        </div>
       </div>
     </div>
+
+    <div class="stats-grid insights-grid">
+      <div class="stat-box">
+        <span class="stat-label">Strengster Bewerter</span>
+        <strong>${strictest ? strictest.participant.name : 'Noch keine Daten'}</strong>
+        <small>${strictest ? `${strictest.average.toFixed(1)}/5 im Schnitt` : 'Sobald mehrere Bewertungen vorliegen.'}</small>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">Groesster Geniesser</span>
+        <strong>${kindest ? kindest.participant.name : 'Noch keine Daten'}</strong>
+        <small>${kindest ? `${kindest.average.toFixed(1)}/5 im Schnitt` : 'Sobald mehrere Bewertungen vorliegen.'}</small>
+      </div>
+    </div>
+
+    <div class="timeline-box" aria-label="Timeline der letzten Bewertungen">
+      <h4>Timeline: Wer hat wann wie bewertet?</h4>
+      ${timelineEntries.length ? `
+        <ul class="timeline-list">
+          ${timelineEntries.map((entry) => `
+            <li>
+              <span class="timeline-time">${entry.when}</span>
+              <span class="timeline-text"><strong>${entry.participantName}</strong> gab <strong>${entry.rating}/5</strong> fuer ${entry.itemName}</span>
+            </li>
+          `).join('')}
+        </ul>
+      ` : '<p class="timeline-empty">Noch keine Bewertungen in der Timeline.</p>'}
+    </div>
+
     <div class="histogram" aria-label="Histogramm der Gesamtbewertungen">
       ${overallHistogram.map((count, index) => `
         <div class="histogram-row">
@@ -560,6 +703,11 @@ function handleAppClick(event) {
 
   if (action === 'category') {
     setActiveCategory(category);
+    return;
+  }
+
+  if (action === 'toggle-participants') {
+    toggleParticipantPanel();
     return;
   }
 

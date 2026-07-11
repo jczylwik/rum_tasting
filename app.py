@@ -12,13 +12,29 @@ WEB_ROOT = ROOT / 'web'
 DATA_FILE = ROOT / 'data.json'
 SUBSCRIBERS = set()
 SUBSCRIBERS_LOCK = threading.Lock()
+DEFAULT_STATE = {
+    'participants': [],
+    'ratings': {},
+    'activeParticipantId': None,
+    'activeCategory': 'rum',
+    'activeItemId': None,
+    'ratingEvents': [],
+}
 
 
 def load_state():
     if not DATA_FILE.exists():
-        return {"participants": [], "ratings": {}}
+        return dict(DEFAULT_STATE)
     with DATA_FILE.open('r', encoding='utf-8') as fh:
-        return json.load(fh)
+        loaded = json.load(fh)
+
+    return {
+        **DEFAULT_STATE,
+        **loaded,
+        'participants': loaded.get('participants') or [],
+        'ratings': loaded.get('ratings') or {},
+        'ratingEvents': loaded.get('ratingEvents') or [],
+    }
 
 
 def save_state(state):
@@ -153,6 +169,8 @@ class Handler(BaseHTTPRequestHandler):
             state['activeCategory'] = payload['activeCategory']
         if 'activeItemId' in payload:
             state['activeItemId'] = payload['activeItemId']
+        if 'ratingEvents' in payload:
+            state['ratingEvents'] = payload['ratingEvents']
         save_state(state)
         broadcast_state_event()
         self._send_json(state)

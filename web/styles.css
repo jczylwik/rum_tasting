@@ -50,6 +50,7 @@ body {
 }
 
 .session-active-participant {
+  border: none;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -59,6 +60,7 @@ body {
   border: 1px solid rgba(225, 166, 75, 0.45);
   color: var(--accent-strong);
   font-weight: 700;
+  cursor: pointer;
 }
 
 .session-active-participant::before {
@@ -70,6 +72,14 @@ body {
 .session-summary {
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+.participant-panel-body {
+  display: block;
+}
+
+#participant-section.collapsed .participant-panel-body {
+  display: none;
 }
 
 button,
@@ -355,6 +365,101 @@ textarea {
   font-size: 0.8rem;
   color: var(--muted);
   margin-bottom: 4px;
+}
+
+.stat-box small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+}
+
+.avg-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.avg-star {
+  --fill: 0%;
+  font-size: 1rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(90deg, var(--accent) var(--fill), rgba(255, 255, 255, 0.18) var(--fill));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.avg-stars-empty {
+  margin-top: 6px;
+  display: inline-block;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.dual-stars {
+  margin-top: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.dual-star-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.insights-grid {
+  margin-bottom: 10px;
+}
+
+.timeline-box {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  margin-bottom: 10px;
+}
+
+.timeline-box h4 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.timeline-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.timeline-list li {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.timeline-time {
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.timeline-text {
+  font-size: 0.84rem;
+  color: var(--text);
+}
+
+.timeline-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .histogram {

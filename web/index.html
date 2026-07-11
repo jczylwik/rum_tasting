@@ -13,7 +13,7 @@
     <header class="session-header" aria-live="polite">
       <div class="session-header-inner">
         <span class="session-label">Live Session</span>
-        <span id="active-participant" class="session-active-participant"></span>
+        <button type="button" id="active-participant" class="session-active-participant" data-action="toggle-participants"></button>
         <span id="session-summary" class="session-summary"></span>
       </div>
     </header>
@@ -30,19 +30,21 @@
         </div>
       </header>
 
-      <section class="card" aria-labelledby="participant-title">
+      <section id="participant-section" class="card" aria-labelledby="participant-title">
         <div class="section-heading">
           <h2 id="participant-title">Teilnehmer</h2>
           <p>Bitte einmal den Namen eingeben und direkt loslegen.</p>
         </div>
 
-        <form id="participant-form" class="inline-form">
-          <label class="sr-only" for="participant-name">Name</label>
-          <input id="participant-name" name="participant-name" type="text" placeholder="Dein Name" maxlength="24" required />
-          <button type="submit">Teilnehmen</button>
-        </form>
+        <div id="participant-panel-body" class="participant-panel-body">
+          <form id="participant-form" class="inline-form">
+            <label class="sr-only" for="participant-name">Name</label>
+            <input id="participant-name" name="participant-name" type="text" placeholder="Dein Name" maxlength="24" required />
+            <button type="submit">Teilnehmen</button>
+          </form>
 
-        <div id="participant-list" class="chip-list" aria-live="polite"></div>
+          <div id="participant-list" class="chip-list" aria-live="polite"></div>
+        </div>
       </section>
 
       <section class="card" aria-labelledby="info-rating-title">
@@ -56,6 +58,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260711-rt3"></script>
+    <script src="app.js?v=20260711-rt4"></script>
   </body>
 </html>
