@@ -123,6 +123,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-Type', mime_type)
         self.send_header('Content-Length', str(len(data)))
+        if target.name in {'index.html', 'app.js', 'sw.js'}:
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         self.end_headers()
         self.wfile.write(data)
 
