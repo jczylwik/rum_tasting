@@ -387,13 +387,17 @@ function renderParticipants() {
 
 function renderActiveParticipant() {
   const container = document.getElementById('active-participant');
+  const summary = document.getElementById('session-summary');
+
   if (!state.activeParticipantId) {
     container.textContent = 'Aktiver Teilnehmer: noch keiner ausgewählt';
+    summary.textContent = `${state.participants.length} Teilnehmer · ${getOverallAverage()}/5 gesamt`;
     return;
   }
 
   const current = state.participants.find((participant) => participant.id === state.activeParticipantId);
   container.textContent = `Aktiver Teilnehmer: ${current?.name || 'Unbekannt'}`;
+  summary.textContent = `${state.participants.length} Teilnehmer · ${getOverallAverage()}/5 gesamt`;
 }
 
 function renderItemExplorer() {
