@@ -10,6 +10,7 @@ __pycache__/
 deploy.zip
 deploy-linux.zip
 backups/
+qrcode.png
 
 # Legacy print outputs
 legacy/print/rum_tasting_print.pdf
