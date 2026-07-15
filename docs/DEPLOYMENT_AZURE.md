@@ -80,6 +80,7 @@ The app can create a backup snapshot on every state update and upload it directl
 - `BACKUP_CONTAINER_SAS_URL_B64` (recommended): base64-encoded container SAS URL with write permission
 - `BACKUP_CONTAINER_SAS_URL` (legacy fallback): plain container SAS URL
 - `BACKUP_PREFIX` (optional): filename prefix, default `state`
+- `BACKUP_MIN_INTERVAL_SECONDS` (optional): minimum seconds between snapshots, default `300`
 
 PowerShell-safe way to configure base64 setting:
 
@@ -89,7 +90,7 @@ $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($sasUrl))
 az webapp config appsettings set --resource-group <RG> --name <APP_NAME> --settings "BACKUP_CONTAINER_SAS_URL_B64=$b64" "BACKUP_PREFIX=state"
 ```
 
-Each successful `/api/state` POST writes a timestamped blob like:
+State updates are coalesced and written at most once per interval (`BACKUP_MIN_INTERVAL_SECONDS`) as a timestamped blob like:
 
 - `state-YYYYMMDD-HHMMSS.json`
 

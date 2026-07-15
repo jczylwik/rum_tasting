@@ -13,7 +13,7 @@ This is a mobile-friendly live tasting app for rum and cigars. It supports parti
 - Filter-aware analytics (overall, all rum, all cigars, or single item)
 - Optional advanced analytics panel (toggle on/off): standard deviation, variance, median, 95% CI + nerd visualization
 - Shared persistence via the API at /api/state
-- Optional Azure Blob snapshots on each state update (via app settings)
+- Optional Azure Blob snapshots on state updates (rate-limited via app settings)
 - Live updates across multiple devices (server-sent events with polling fallback)
 - Installable Progressive Web App (PWA)
 - Azure App Service deployment prepared

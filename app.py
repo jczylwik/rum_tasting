@@ -4,6 +4,8 @@ import mimetypes
 import queue
 import threading
 import base64
+import hashlib
+import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -35,11 +37,24 @@ if backup_url_b64:
 else:
     BACKUP_CONTAINER_SAS_URL = os.environ.get('BACKUP_CONTAINER_SAS_URL', '').strip()
 BACKUP_PREFIX = os.environ.get('BACKUP_PREFIX', 'state').strip() or 'state'
+BACKUP_MIN_INTERVAL_SECONDS = max(1, int(os.environ.get('BACKUP_MIN_INTERVAL_SECONDS', '300')))
+
+BACKUP_LOCK = threading.Lock()
+BACKUP_LAST_UPLOAD_TS = 0.0
+BACKUP_LAST_SIGNATURE = ''
+BACKUP_PENDING_STATE = None
+BACKUP_PENDING_SIGNATURE = ''
+BACKUP_TIMER = None
+
+
+def _state_signature(state):
+    payload = json.dumps(state, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    return hashlib.sha256(payload).hexdigest()
 
 
 def upload_backup_to_azure_blob(state):
     if not BACKUP_CONTAINER_SAS_URL:
-        return
+        return False
 
     try:
         ts = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
@@ -61,8 +76,74 @@ def upload_backup_to_azure_blob(state):
         req.add_header('x-ms-version', '2021-12-02')
         with urlopen(req, timeout=15):
             pass
+        return True
     except Exception as exc:
         print(f'Backup upload failed: {exc}')
+        return False
+
+
+def _schedule_pending_backup(delay_seconds):
+    global BACKUP_TIMER
+    BACKUP_TIMER = threading.Timer(delay_seconds, flush_pending_backup)
+    BACKUP_TIMER.daemon = True
+    BACKUP_TIMER.start()
+
+
+def schedule_backup(state):
+    global BACKUP_PENDING_STATE, BACKUP_PENDING_SIGNATURE
+    if not BACKUP_CONTAINER_SAS_URL:
+        return
+
+    signature = _state_signature(state)
+    state_copy = json.loads(json.dumps(state, ensure_ascii=False))
+
+    with BACKUP_LOCK:
+        if signature == BACKUP_LAST_SIGNATURE:
+            return
+
+        BACKUP_PENDING_STATE = state_copy
+        BACKUP_PENDING_SIGNATURE = signature
+
+        if BACKUP_TIMER is not None:
+            return
+
+        now = time.time()
+        elapsed = now - BACKUP_LAST_UPLOAD_TS
+        delay_seconds = 0 if elapsed >= BACKUP_MIN_INTERVAL_SECONDS else BACKUP_MIN_INTERVAL_SECONDS - elapsed
+        _schedule_pending_backup(delay_seconds)
+
+
+def flush_pending_backup():
+    global BACKUP_LAST_UPLOAD_TS, BACKUP_LAST_SIGNATURE, BACKUP_PENDING_STATE, BACKUP_PENDING_SIGNATURE, BACKUP_TIMER
+
+    with BACKUP_LOCK:
+        BACKUP_TIMER = None
+        pending_state = BACKUP_PENDING_STATE
+        pending_signature = BACKUP_PENDING_SIGNATURE
+        BACKUP_PENDING_STATE = None
+        BACKUP_PENDING_SIGNATURE = ''
+
+    if not pending_state:
+        return
+
+    try:
+        upload_ok = upload_backup_to_azure_blob(pending_state)
+        if not upload_ok:
+            raise RuntimeError('backup upload returned false')
+        with BACKUP_LOCK:
+            BACKUP_LAST_UPLOAD_TS = time.time()
+            BACKUP_LAST_SIGNATURE = pending_signature
+            has_more_pending = BACKUP_PENDING_STATE is not None
+            if has_more_pending and BACKUP_TIMER is None:
+                _schedule_pending_backup(BACKUP_MIN_INTERVAL_SECONDS)
+    except Exception:
+        with BACKUP_LOCK:
+            # Requeue the pending state and retry later.
+            if BACKUP_PENDING_STATE is None:
+                BACKUP_PENDING_STATE = pending_state
+                BACKUP_PENDING_SIGNATURE = pending_signature
+            if BACKUP_TIMER is None:
+                _schedule_pending_backup(BACKUP_MIN_INTERVAL_SECONDS)
 
 
 def load_state():
@@ -226,7 +307,7 @@ class Handler(BaseHTTPRequestHandler):
             state['customRums'] = payload['customRums']
         save_state(state)
         broadcast_state_event()
-        threading.Thread(target=upload_backup_to_azure_blob, args=(state,), daemon=True).start()
+        schedule_backup(state)
         self._send_json(state)
 
     def log_message(self, format, *args):
