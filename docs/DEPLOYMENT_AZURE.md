@@ -71,6 +71,24 @@ az webapp config set --resource-group <RG> --name <APP_NAME> --startup-file "pyt
 - The app does not use a database; persistent JSON storage provides shared state.
 - If clients show stale UI after deployment, bump script version in `web/index.html` and reload once.
 
+## Deploy With Backup State (recommended for post-event archive restores)
+
+If you want a deployment to always start with a known saved state, deploy with a backup file as `data.json`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-with-backup.ps1
+```
+
+By default this uses the newest file from `backups/`.
+
+Use a specific file:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-with-backup.ps1 -BackupFile .\backups\state-YYYYMMDD-HHMMSS.json
+```
+
+This path avoids manual post-deploy restore calls.
+
 ## Verified Target Configuration (as of 2026-07-11)
 
 - App Service Runtime: `PYTHON|3.10`

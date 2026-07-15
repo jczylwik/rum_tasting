@@ -27,8 +27,12 @@ DEFAULT_STATE = {
 def load_state():
     if not DATA_FILE.exists():
         return dict(DEFAULT_STATE)
-    with DATA_FILE.open('r', encoding='utf-8') as fh:
-        loaded = json.load(fh)
+    try:
+        # utf-8-sig accepts both UTF-8 with and without BOM.
+        with DATA_FILE.open('r', encoding='utf-8-sig') as fh:
+            loaded = json.load(fh)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        loaded = {}
 
     return {
         **DEFAULT_STATE,
