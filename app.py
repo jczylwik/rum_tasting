@@ -6,10 +6,11 @@ import threading
 import base64
 import hashlib
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
@@ -38,6 +39,8 @@ else:
     BACKUP_CONTAINER_SAS_URL = os.environ.get('BACKUP_CONTAINER_SAS_URL', '').strip()
 BACKUP_PREFIX = os.environ.get('BACKUP_PREFIX', 'state').strip() or 'state'
 BACKUP_MIN_INTERVAL_SECONDS = max(1, int(os.environ.get('BACKUP_MIN_INTERVAL_SECONDS', '300')))
+BACKUP_AUTO_RESTORE_ON_EMPTY = os.environ.get('BACKUP_AUTO_RESTORE_ON_EMPTY', '1').strip() != '0'
+BACKUP_AUTO_RESTORE_RETRY_SECONDS = max(5, int(os.environ.get('BACKUP_AUTO_RESTORE_RETRY_SECONDS', '30')))
 
 BACKUP_LOCK = threading.Lock()
 BACKUP_LAST_UPLOAD_TS = 0.0
@@ -45,11 +48,115 @@ BACKUP_LAST_SIGNATURE = ''
 BACKUP_PENDING_STATE = None
 BACKUP_PENDING_SIGNATURE = ''
 BACKUP_TIMER = None
+BACKUP_RESTORE_LOCK = threading.Lock()
+BACKUP_RESTORE_LAST_ATTEMPT_TS = 0.0
 
 
 def _state_signature(state):
     payload = json.dumps(state, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
     return hashlib.sha256(payload).hexdigest()
+
+
+def _state_has_user_data(state):
+    if not isinstance(state, dict):
+        return False
+    if state.get('participants'):
+        return True
+    if state.get('ratingEvents'):
+        return True
+    if state.get('comments'):
+        return True
+    if state.get('customRums'):
+        return True
+    ratings = state.get('ratings')
+    if isinstance(ratings, dict) and ratings:
+        return True
+    return False
+
+
+def _parse_backup_container_url():
+    if not BACKUP_CONTAINER_SAS_URL:
+        return None, None
+    container_url, _, sas_query = BACKUP_CONTAINER_SAS_URL.partition('?')
+    container_url = container_url.strip().rstrip('/')
+    sas_query = sas_query.strip()
+    if not container_url or not sas_query:
+        return None, None
+    return container_url, sas_query
+
+
+def _fetch_backup_blob_names():
+    container_url, sas_query = _parse_backup_container_url()
+    if not container_url:
+        return []
+
+    prefix = quote(f'{BACKUP_PREFIX}-')
+    list_url = f'{container_url}?restype=container&comp=list&prefix={prefix}&maxresults=200&{sas_query}'
+    req = Request(list_url, method='GET')
+    req.add_header('x-ms-version', '2021-12-02')
+    with urlopen(req, timeout=15) as response:
+        xml_text = response.read().decode('utf-8-sig', errors='replace').lstrip('\ufeff')
+
+    root = ET.fromstring(xml_text)
+    names = []
+    for blob in root.findall('.//Blob'):
+        node = blob.find('Name')
+        if node is not None and node.text:
+            names.append(node.text.strip())
+    names.sort(reverse=True)
+    return names
+
+
+def _download_backup_blob(blob_name):
+    container_url, sas_query = _parse_backup_container_url()
+    if not container_url:
+        return None
+    blob_url = f'{container_url}/{blob_name}?{sas_query}'
+    req = Request(blob_url, method='GET')
+    req.add_header('x-ms-version', '2021-12-02')
+    with urlopen(req, timeout=15) as response:
+        payload = response.read().decode('utf-8-sig', errors='strict')
+    loaded = json.loads(payload)
+    if not isinstance(loaded, dict):
+        return None
+    return loaded
+
+
+def _try_restore_state_from_backups():
+    if not BACKUP_CONTAINER_SAS_URL:
+        return None
+    try:
+        names = _fetch_backup_blob_names()
+        for blob_name in names:
+            try:
+                candidate = _download_backup_blob(blob_name)
+                if _state_has_user_data(candidate):
+                    print(f'Auto-restored state from backup blob: {blob_name}')
+                    return candidate
+            except Exception as exc:
+                print(f'Skipped unreadable backup blob {blob_name}: {exc}')
+    except Exception as exc:
+        print(f'Backup auto-restore listing failed: {exc}')
+    return None
+
+
+def _attempt_startup_restore_if_needed(current_state):
+    global BACKUP_RESTORE_LAST_ATTEMPT_TS
+    if not BACKUP_AUTO_RESTORE_ON_EMPTY:
+        return None
+    if _state_has_user_data(current_state):
+        return None
+
+    now = time.time()
+    with BACKUP_RESTORE_LOCK:
+        if now - BACKUP_RESTORE_LAST_ATTEMPT_TS < BACKUP_AUTO_RESTORE_RETRY_SECONDS:
+            return None
+        BACKUP_RESTORE_LAST_ATTEMPT_TS = now
+
+    restored = _try_restore_state_from_backups()
+    if isinstance(restored, dict) and _state_has_user_data(restored):
+        return restored
+    return None
 
 
 def upload_backup_to_azure_blob(state):
@@ -92,6 +199,8 @@ def _schedule_pending_backup(delay_seconds):
 def schedule_backup(state):
     global BACKUP_PENDING_STATE, BACKUP_PENDING_SIGNATURE
     if not BACKUP_CONTAINER_SAS_URL:
+        return
+    if not _state_has_user_data(state):
         return
 
     signature = _state_signature(state)
@@ -148,6 +257,18 @@ def flush_pending_backup():
 
 def load_state():
     if not DATA_FILE.exists():
+        restored = _attempt_startup_restore_if_needed(dict(DEFAULT_STATE))
+        if restored:
+            save_state(restored)
+            return {
+                **DEFAULT_STATE,
+                **restored,
+                'participants': restored.get('participants') or [],
+                'ratings': restored.get('ratings') or {},
+                'ratingEvents': restored.get('ratingEvents') or [],
+                'comments': restored.get('comments') or [],
+                'customRums': restored.get('customRums') or [],
+            }
         return dict(DEFAULT_STATE)
     try:
         # utf-8-sig accepts both UTF-8 with and without BOM.
@@ -155,6 +276,14 @@ def load_state():
             loaded = json.load(fh)
     except (json.JSONDecodeError, UnicodeDecodeError):
         loaded = {}
+
+    if not isinstance(loaded, dict):
+        loaded = {}
+
+    restored = _attempt_startup_restore_if_needed(loaded)
+    if restored:
+        loaded = restored
+        save_state(loaded)
 
     return {
         **DEFAULT_STATE,

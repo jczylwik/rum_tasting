@@ -77,10 +77,12 @@ The app can create a backup snapshot on every state update and upload it directl
 
 ### Required app settings
 
-- `BACKUP_CONTAINER_SAS_URL_B64` (recommended): base64-encoded container SAS URL with write permission
+- `BACKUP_CONTAINER_SAS_URL_B64` (recommended): base64-encoded container SAS URL with permissions `cwlr`
 - `BACKUP_CONTAINER_SAS_URL` (legacy fallback): plain container SAS URL
 - `BACKUP_PREFIX` (optional): filename prefix, default `state`
 - `BACKUP_MIN_INTERVAL_SECONDS` (optional): minimum seconds between snapshots, default `300`
+- `BACKUP_AUTO_RESTORE_ON_EMPTY` (optional): `1` enables startup restore if local state is empty (default `1`)
+- `BACKUP_AUTO_RESTORE_RETRY_SECONDS` (optional): retry cooldown for empty-state auto-restore attempts, default `30`
 
 PowerShell-safe way to configure base64 setting:
 
@@ -93,6 +95,8 @@ az webapp config appsettings set --resource-group <RG> --name <APP_NAME> --setti
 State updates are coalesced and written at most once per interval (`BACKUP_MIN_INTERVAL_SECONDS`) as a timestamped blob like:
 
 - `state-YYYYMMDD-HHMMSS.json`
+
+On process startup, if `data.json` is missing/empty/corrupt, the app automatically restores from the newest non-empty blob snapshot (when `BACKUP_AUTO_RESTORE_ON_EMPTY=1`).
 
 ### Why this is recommended on Free plan
 
