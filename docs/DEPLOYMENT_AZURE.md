@@ -71,6 +71,34 @@ az webapp config set --resource-group <RG> --name <APP_NAME> --startup-file "pyt
 - The app does not use a database; persistent JSON storage provides shared state.
 - If clients show stale UI after deployment, bump script version in `web/index.html` and reload once.
 
+## Azure-Hosted Backups (no local scheduler)
+
+The app can create a backup snapshot on every state update and upload it directly to Azure Blob Storage.
+
+### Required app settings
+
+- `BACKUP_CONTAINER_SAS_URL_B64` (recommended): base64-encoded container SAS URL with write permission
+- `BACKUP_CONTAINER_SAS_URL` (legacy fallback): plain container SAS URL
+- `BACKUP_PREFIX` (optional): filename prefix, default `state`
+
+PowerShell-safe way to configure base64 setting:
+
+```powershell
+$sasUrl = "https://<account>.blob.core.windows.net/<container>?<sas-token>"
+$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($sasUrl))
+az webapp config appsettings set --resource-group <RG> --name <APP_NAME> --settings "BACKUP_CONTAINER_SAS_URL_B64=$b64" "BACKUP_PREFIX=state"
+```
+
+Each successful `/api/state` POST writes a timestamped blob like:
+
+- `state-YYYYMMDD-HHMMSS.json`
+
+### Why this is recommended on Free plan
+
+- No local machine scheduler required.
+- Backups are external to the app filesystem.
+- Data snapshots survive app restarts, plan moves, and redeploys.
+
 ## Deploy With Backup State (recommended for post-event archive restores)
 
 If you want a deployment to always start with a known saved state, deploy with a backup file as `data.json`:

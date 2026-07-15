@@ -3,9 +3,12 @@ import os
 import mimetypes
 import queue
 import threading
+import base64
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 WEB_ROOT = ROOT / 'web'
@@ -22,6 +25,44 @@ DEFAULT_STATE = {
     'comments': [],
     'customRums': [],
 }
+
+backup_url_b64 = os.environ.get('BACKUP_CONTAINER_SAS_URL_B64', '').strip()
+if backup_url_b64:
+    try:
+        BACKUP_CONTAINER_SAS_URL = base64.b64decode(backup_url_b64).decode('utf-8').strip()
+    except Exception:
+        BACKUP_CONTAINER_SAS_URL = ''
+else:
+    BACKUP_CONTAINER_SAS_URL = os.environ.get('BACKUP_CONTAINER_SAS_URL', '').strip()
+BACKUP_PREFIX = os.environ.get('BACKUP_PREFIX', 'state').strip() or 'state'
+
+
+def upload_backup_to_azure_blob(state):
+    if not BACKUP_CONTAINER_SAS_URL:
+        return
+
+    try:
+        ts = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
+        blob_name = f'{BACKUP_PREFIX}-{ts}.json'
+        container_url, _, sas_query = BACKUP_CONTAINER_SAS_URL.partition('?')
+        if not container_url:
+            return
+
+        upload_url = f"{container_url.rstrip('/')}/{blob_name}"
+        if sas_query:
+            upload_url = f'{upload_url}?{sas_query}'
+
+        payload = json.dumps(state, ensure_ascii=False, indent=2).encode('utf-8')
+        req = Request(upload_url, data=payload, method='PUT')
+        req.add_header('x-ms-blob-type', 'BlockBlob')
+        req.add_header('Content-Type', 'application/json; charset=utf-8')
+        req.add_header('Content-Length', str(len(payload)))
+        # Explicit API version keeps request behavior stable across environments.
+        req.add_header('x-ms-version', '2021-12-02')
+        with urlopen(req, timeout=15):
+            pass
+    except Exception as exc:
+        print(f'Backup upload failed: {exc}')
 
 
 def load_state():
@@ -185,6 +226,7 @@ class Handler(BaseHTTPRequestHandler):
             state['customRums'] = payload['customRums']
         save_state(state)
         broadcast_state_event()
+        threading.Thread(target=upload_backup_to_azure_blob, args=(state,), daemon=True).start()
         self._send_json(state)
 
     def log_message(self, format, *args):
